@@ -756,205 +756,89 @@ function parse(text){
   }
 
 
-  // ── 语义词组编排器 ─────────────────────────────────────
-  // 先识别完整语义片段，再把动作、修饰语、宾语组成一个 NAI 语义单元。
-  // 这样“伸出手指”不会被拆成 finger，而会优先解释成 pointing。
+  // ── 语义词组编排器 v2 ─────────────────────────────────
+  // 不再依赖“一个中文词 = 一个英文标签”。先识别语义角色，再把同一
+  // 局部事件里的主体、动作、修饰和宾语合成为一个 NAI 可读的短语单元。
   const semanticGroups = [
-    {re:/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/, tags:["pointing"], phrase:"pointing"},
-    {re:/(牵着|牵住|牵手|手牵手)(.{0,8})(手)/, tags:["holding hands"], phrase:"holding hands"},
-    {re:/(坐在|坐着)(.{0,8})(窗边|靠窗)/, tags:["sitting","by window"], phrase:"sitting by window"},
-    {re:/(面对面|面对彼此|互相面对)(.{0,8})(坐着|坐在)/, tags:["facing each other","sitting"], phrase:"facing each other while sitting"},
-    {re:/(穿|穿着|身穿)(.{0,8})(白裙|白色连衣裙)/, tags:["white dress"], phrase:"wearing a white dress"},
-    {re:/(穿|穿着|身穿)(.{0,8})(黑西装|黑色西装)/, tags:["black suit"], phrase:"wearing a black suit"},
-    {re:/(撑伞|撑着伞|打伞|拿着伞)(.{0,8})(透明|黑色|白色)?/, tags:["holding umbrella"], phrase:"holding $3 umbrella"},
-    {re:/(手里拿着|拿着|手持|捧着)(.{0,8})(红花|红色的花)/, tags:["holding flower"], phrase:"holding a red flower"}
+    {re:/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/, phrase:"pointing with finger", consume:["pointing","finger"]},
+    {re:/牵着手|牵住手|牵手|手牵手/, phrase:"holding hands", consume:["holding hands"]},
+    {re:/坐在.{0,12}(窗边|靠窗)/, phrase:"sitting by window", consume:["sitting","by window"]},
+    {re:/(面对面|面对彼此|互相面对).{0,8}(坐着|坐在)/, phrase:"facing each other while sitting", consume:["facing each other","sitting"]}
   ];
+
+  const phraseExists = p => tags.some(x=>x.tag===p);
+  const consumeTags = list => list.forEach(t=>{ if(tags.some(x=>x.tag===t)) removeTag(t); });
   const applySemanticGroups = () => {
     semanticGroups.forEach(rule=>{
-      const m=text.match(rule.re);
-      if(!m) return;
-      const members=rule.tags.filter(t=>tags.some(x=>x.tag===t));
-      if(!members.length) return;
-      let phrase=rule.phrase;
-      for(let i=1;i<m.length;i++) phrase=phrase.replace("$"+i,m[i]||"");
-      phrase=phrase.replace(/\\s{2,}/g," ").replace(/\\s+umbrella$/," umbrella").trim();
-      if(!phrase || phrase.includes("$")) return;
-      members.forEach(removeTag);
-      add(phrase,Math.min(1.30,1.13+emphasisBoost));
-    });
-  };
-
-  // ── 通用中文句子理解层 ───────────────────────────────────
-  // 优先从完整词库寻找最长中文别名，再结合句子中的动作/关系词，
-  // 将一句话拆成“人物 + 属性 + 动作 + 场景”，而不是只能依赖少量正则。
-  const sentenceVocab = allVocabulary()
-    .filter(e=>e && e.canonical_tag)
-    .map(e=>({...e,_aliases:[e.canonical_tag,...(e.aliases||[])]
-      .filter(Boolean).sort((a,b)=>String(b).length-String(a).length)}));
-  const sentenceMatched = new Set(tags.map(x=>x.tag));
-  const sentenceHits = [];
-  sentenceVocab.forEach(e=>e._aliases.forEach(alias=>{
-    const a=String(alias).trim();
-    if(!a || /^[A-Za-z0-9 _-]+$/.test(a) || a.length<2) return;
-    let from=0;
-    while(true){
-      const p=text.indexOf(a,from);
-      if(p<0) break;
-      sentenceHits.push({entry:e,alias:a,pos:p,end:p+a.length});
-      from=p+a.length;
-    }
-  }));
-  sentenceHits.sort((a,b)=>(b.alias.length-a.alias.length)||(a.pos-b.pos));
-  const occupied=[];
-  sentenceHits.forEach(hit=>{
-    if(occupied.some(r=>hit.pos<r.end && hit.end>r.pos)) return;
-    occupied.push(hit);
-    if(sentenceMatched.has(hit.entry.canonical_tag)) return;
-    let w=1;
-    if(["appearance","hair","eyes","face"].includes(hit.entry.category)) w=1.18;
-    else if(["action","pose"].includes(hit.entry.category)) w=1.14;
-    else if(["clothing","accessories","footwear"].includes(hit.entry.category)) w=1.10;
-    add(hit.entry.canonical_tag,w);
-    sentenceMatched.add(hit.entry.canonical_tag);
-  });
-
-  // 中文功能词只解释关系，不直接生成不存在的英文标签。
-  const sentenceRelations=[
-    [/穿着|穿上|身穿/,"clothing"],
-    [/拿着|拿了|手里拿着|手持|握着|捧着/,"object"],
-    [/站在|站着|站于/,"standing"],
-    [/坐在|坐着|坐于/,"sitting"],
-    [/走在|走着|正在走|行走于/,"walking"],
-    [/跑在|跑着|正在跑|奔跑于/,"running"],
-    [/看着|望着|注视着|凝视着|盯着|对视/,"looking"]
-  ];
-  sentenceRelations.forEach(([re,kind])=>{
-    if(!re.test(text)) return;
-    tags.forEach(x=>{
-      const e=allVocabulary().find(v=>v.canonical_tag===x.tag);
-      if(!e) return;
-      if(kind==="clothing" && ["clothing","accessories","footwear"].includes(e.category)) x.weight=Math.min(1.30,x.weight+0.04);
-      if(kind==="object" && ["object","nature","animal","food","accessories"].includes(e.category)) x.weight=Math.min(1.30,x.weight+0.03);
-      if(kind==="standing" && x.tag==="standing") x.weight=Math.min(1.30,x.weight+0.04);
-      if(kind==="sitting" && x.tag==="sitting") x.weight=Math.min(1.30,x.weight+0.04);
-      if(kind==="walking" && x.tag==="walking") x.weight=Math.min(1.30,x.weight+0.04);
-      if(kind==="running" && x.tag==="running") x.weight=Math.min(1.30,x.weight+0.04);
-      if(kind==="looking" && ["looking at each other","facing each other"].includes(x.tag)) x.weight=Math.min(1.30,x.weight+0.05);
-    });
-  });
-
-  // ── 通用句法/短语解析层 ─────────────────────────────────
-  // 开源词库只负责提供“词”，这里负责把“修饰词 + 中心词 + 动作 + 场景”
-  // 从中文句子中组合成可用的 NAI 多词标签。不会凭空制造不存在的基础词。
-  const parseChinesePhrases = () => {
-    const entries = allVocabulary();
-    const lowerText = text.toLowerCase();
-
-    const colorMap = [
-      ["黑色","black"],["黑","black"],["白色","white"],["白","white"],
-      ["红色","red"],["红","red"],["蓝色","blue"],["蓝","blue"],
-      ["绿色","green"],["绿","green"],["黄色","yellow"],["黄","yellow"],
-      ["紫色","purple"],["紫","purple"],["粉色","pink"],["粉","pink"],
-      ["棕色","brown"],["棕","brown"],["灰色","grey"],["灰","grey"],
-      ["银色","silver"],["银","silver"]
-    ];
-    const lengthMap=[["很长","long"],["长","long"],["很短","short"],["短","short"]];
-    const findEntry = tag => entries.find(e=>e.canonical_tag===tag);
-    const aliasesFor = e => [e.canonical_tag,...(e.aliases||[])].filter(Boolean);
-    const posOf = e => aliasesFor(e).map(a=>text.indexOf(a)).filter(i=>i>=0).sort((a,b)=>a-b)[0] ?? -1;
-
-    const existing = new Set(tags.map(x=>x.tag));
-    const addPhrase=(phrase,weight=1.12,consume=[])=>{
-      if(!phrase || tags.some(x=>x.tag===phrase)) return;
-      consume.forEach(t=>removeTag(t));
-      add(phrase,Math.min(1.30,weight+emphasisBoost));
-    };
-
-    // 找到中文句子中的中心名词，再读取它前面的颜色/长度等修饰语。
-    entries.forEach(e=>{
-      if(!e||!e.canonical_tag||e.category==="open_source") return;
-      const ep=posOf(e);
-      if(ep<0) return;
-      const before=text.slice(Math.max(0,ep-12),ep);
-      const modifiers=[];
-      colorMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
-      lengthMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
-      if(!modifiers.length) return;
-      const phrase=[...new Set(modifiers)].concat(e.canonical_tag).join(" ");
-      if(modifiers.length && !existing.has(phrase)) addPhrase(phrase,1.10,[e.canonical_tag,...modifiers.filter(x=>existing.has(x))]);
+      if(!rule.re.test(text) || phraseExists(rule.phrase)) return;
+      const usable=rule.consume.filter(t=>tags.some(x=>x.tag===t));
+      // 关系短语即使只有一个基础动作标签，也可以成立；不要因为另一个
+      // 身体部位词未进入词库而退化成散标签。
+      if(!usable.length) return;
+      consumeTags(usable);
+      add(rule.phrase,Math.min(1.30,1.16+emphasisBoost));
     });
 
-    // 对开源中文词库中的名词同样进行颜色/长度组合。
-    entries.filter(e=>e&&e.category==="open_source").forEach(e=>{
-      const ep=posOf(e);
-      if(ep<0) return;
-      const before=text.slice(Math.max(0,ep-12),ep);
-      const modifiers=[];
-      colorMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
-      lengthMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
-      if(!modifiers.length) return;
-      const phrase=[...new Set(modifiers)].concat(e.canonical_tag).join(" ");
-      addPhrase(phrase,1.08);
-    });
+    // 通用“动作 + 宾语/地点”编排：从当前标签及其中文别名的位置
+    // 推断局部关系，而不是为每一种名词写一条正则。
+    const nodes=tags.map((x,i)=>{
+      const e=entryFor(x.tag);
+      const aliases=[x.tag,...(e?.aliases||[])].filter(Boolean);
+      const positions=aliases.map(a=>text.indexOf(a)).filter(p=>p>=0);
+      return {tag:x.tag,category:e?.category||"unknown",pos:positions.length?Math.min(...positions):-1,index:i};
+    }).filter(x=>x.pos>=0);
 
-    // 常见“动作 + 场景/宾语”句式：优先保留动作和名词，再组合成自然的 NAI 短语。
-    const relationPatterns=[
-      {re:/(拿着|拿了|手里拿着|拿着一把)(.{0,8})(伞)/, action:"holding umbrella", object:/伞/},
-      {re:/(撑着|撑伞|打着|打伞)(.{0,8})(伞)/, action:"holding umbrella", object:/伞/},
-      {re:/(抱着|抱住)(.{0,8})(猫|狗|兔子)/, action:"holding", object:/猫|狗|兔子/},
-      {re:/(看着|望着|注视着)(.{0,8})(对方|彼此|她|他)/, action:"looking at each other"},
-      {re:/(靠着|倚着)(.{0,8})(墙|窗|门|树)/, action:"leaning against"},
-      {re:/(坐在|坐着)(.{0,8})(椅子|沙发|床|地面)/, action:"sitting"},
-    ];
-    relationPatterns.forEach(r=>{
-      const m=text.match(r.re);
-      if(!m) return;
-      const objectZh=m[3]||"";
-      const objectEntry=objectZh ? entries.find(e=>aliasesFor(e).some(a=>a===objectZh)) : null;
-      const objectTag=objectEntry?.canonical_tag;
-      if(objectTag){
-        const phrase=r.action+" "+objectTag;
-        addPhrase(phrase,1.13,[r.action,objectTag]);
+    const actionNodes=nodes.filter(x=>["action","pose"].includes(x.category));
+    const objectNodes=nodes.filter(x=>["object","environment","nature","animal","food","composition"].includes(x.category));
+
+    actionNodes.forEach(action=>{
+      const nearby=objectNodes
+        .filter(obj=>Math.abs(obj.pos-action.pos)<=18)
+        .sort((a,b)=>Math.abs(a.pos-action.pos)-Math.abs(b.pos-action.pos))[0];
+      if(!nearby) return;
+
+      const cue=text.slice(Math.min(action.pos,nearby.pos),Math.max(action.pos,nearby.pos)+24);
+      let phrase="";
+      if(/(坐在|坐着|坐于)/.test(cue)) phrase=action.tag+" on "+nearby.tag;
+      else if(/(站在|站着|站于)/.test(cue)) phrase=action.tag+" at "+nearby.tag;
+      else if(/(靠着|倚着|倚靠)/.test(cue)) phrase=action.tag+" against "+nearby.tag;
+      else if(/(指着|指向|指给)/.test(cue)) phrase=action.tag+" at "+nearby.tag;
+      else if(/(看着|望着|注视着|凝视着|盯着)/.test(cue)) phrase=action.tag+" at "+nearby.tag;
+      else return;
+
+      if(!phraseExists(phrase)){
+        removeTag(action.tag);
+        removeTag(nearby.tag);
+        add(phrase,Math.min(1.30,1.12+emphasisBoost));
       }
     });
 
-    // 中文“在X里/在X中/于X”场景关系。
-    const scenePatterns=[
-      ["在雨中","in the rain","rain"],
-      ["在雨夜","in the rain at night","rain","night"],
-      ["在夜里","at night","night"],
-      ["在夜晚","at night","night"],
-      ["在室内","indoors","indoors"],
-      ["在室外","outdoors","outdoors"],
-      ["在森林里","in the forest","forest"],
-      ["在海边","at the beach","beach"],
-      ["在街道上","on the street","street"],
-    ];
-    scenePatterns.forEach(([zh,phrase,...members])=>{
-      if(!text.includes(zh)) return;
-      const presentMembers=members.filter(t=>present.has(t));
-      if(presentMembers.length) addPhrase(phrase,1.10,presentMembers);
+    // 通用“动作 + 环境”事件：同一局部中文范围内才组合。
+    const envNodes=tags.map((x,i)=>{
+      const e=entryFor(x.tag);
+      const aliases=[x.tag,...(e?.aliases||[])].filter(Boolean);
+      const positions=aliases.map(a=>text.indexOf(a)).filter(p=>p>=0);
+      return {tag:x.tag,category:e?.category||"unknown",pos:positions.length?Math.min(...positions):-1,index:i};
+    }).filter(x=>x.pos>=0 && x.category==="environment");
+
+    tags.slice().forEach(x=>{
+      const e=entryFor(x.tag);
+      if(!e || !["action","pose"].includes(e.category)) return;
+      const ap=nodes.find(n=>n.tag===x.tag)?.pos;
+      if(ap==null || ap<0) return;
+      const env=envNodes.filter(n=>Math.abs(n.pos-ap)<=24).sort((a,b)=>Math.abs(a.pos-ap)-Math.abs(b.pos-ap))[0];
+      if(!env) return;
+      const cue=text.slice(Math.min(ap,env.pos),Math.max(ap,env.pos)+18);
+      let phrase="";
+      if(/(走在|走着|正在走|行走)/.test(cue)) phrase=x.tag+" in "+env.tag;
+      else if(/(站在|站着|站于)/.test(cue)) phrase=x.tag+" in "+env.tag;
+      else if(/(坐在|坐着|坐于)/.test(cue)) phrase=x.tag+" in "+env.tag;
+      if(phrase && !phraseExists(phrase)){
+        removeTag(x.tag); removeTag(env.tag);
+        add(phrase,Math.min(1.30,1.10+emphasisBoost));
+      }
     });
   };
-
-  // 语义状态先初始化，再运行短语解析，避免初始化顺序导致生成失败。
-  const present = new Set(tags.map(x=>x.tag));
-  const indexOfTag = tag => tags.findIndex(x=>x.tag===tag);
-  const removeTag = tag => {
-    const i=indexOfTag(tag);
-    if(i>=0) tags.splice(i,1);
-    present.delete(tag);
-  };
-  const emphasisBoost = (() => {
-    let n=0;
-    if(/最重要的是|重点是|核心是|关键是|一定要|必须有|不能丢|不要丢|务必/.test(text)) n+=0.10;
-    if(/非常|极其|特别|格外|强烈|明显|紧紧|牢牢|用力|深深/.test(text)) n+=0.05;
-    if(/有些|略显|隐约|淡淡|轻微|稍微|一点点/.test(text)) n-=0.03;
-    return n;
-  })();
-
-  parseChinesePhrases();
-  applySemanticGroups();
 
   // ── 自然语义编排层 ─────────────────────────────────────
   // 词库负责“词是什么”，这里负责“这些词在句子里是什么关系”。
