@@ -488,6 +488,7 @@ function renderVocab(){
   const list = allVocabulary().filter(e=>{
     if(activeCategory!=="all" && e.category!==activeCategory) return false;
     if(source==="local" && e.source!=="adapter") return false;
+    if(source==="open_source" && e.source!=="open-source: Yellow-Rush/zh_CN-Tags") return false;
     if(source==="custom" && e.source!=="custom") return false;
     if(q && ![e.canonical_tag,...(e.aliases||[])].join(" ").toLowerCase().includes(q)) return false;
     return true;
