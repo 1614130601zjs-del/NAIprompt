@@ -249,12 +249,16 @@ function writeJSON(key,value){
   try{ localStorage.setItem(key,JSON.stringify(value)); }catch(e){ console.warn("NAI storage write failed:",key,e); }
 }
 
-let chars = readJSON(KEY,[]);
+const readArray = key => {
+  const value = readJSON(key,[]);
+  return Array.isArray(value) ? value : [];
+};
+let chars = readArray(KEY);
 let editing = null, intent = "none";
-let customVocabulary = readJSON(CKEY,[]);
-let selected = new Set(readJSON(VKEY,[]));
+let customVocabulary = readArray(CKEY);
+let selected = new Set(readArray(VKEY));
 let activeCategory = "all";
-let library = readJSON(LKEY,[]);
+let library = readArray(LKEY);
 let editingSave = null;
 
 const $ = s => document.querySelector(s);
@@ -398,7 +402,7 @@ function renderVocab(){
 
 function toggleTag(tag){
   selected.has(tag) ? selected.delete(tag) : selected.add(tag);
-  localStorage.setItem(VKEY, JSON.stringify([...selected]));
+  writeJSON(VKEY,[...selected]);
   renderVocab(); renderSelected();
 }
 function renderSelected(){
