@@ -189,19 +189,19 @@ const bt="`";
 function parseMarkdownVocabulary(text){
   const out=[],seen=new Set();
   const add=(tag,aliases=[],category="custom")=>{
-    tag=String(tag||"").trim().replace(/^\\*+|\\*+$/g,"").replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
+    tag=String(tag||"").trim().replace(/^\*+|\*+$/g,"").replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
     aliases=(Array.isArray(aliases)?aliases:[aliases]).map(x=>String(x||"").trim()).filter(Boolean);
-    if(!tag||seen.has(tag)||/^[-*_]{3,}$/.test(tag)||/^https?:\\/\\//i.test(tag)||tag.length>180)return;
+    if(!tag||seen.has(tag)||/^[-*_]{3,}$/.test(tag)||/^https?:\/\//i.test(tag)||tag.length>180)return;
     seen.add(tag);out.push({canonical_tag:tag,aliases,category,related:[],conflicts:[],source:"custom"});
   };
-  const lines=String(text||"").replace(/^\\uFEFF/,"").split(/\\r?\\n/);
+  const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/);
   let header=null;
   for(let raw of lines){
     let line=raw.trim(); if(!line)continue;
-    if(new RegExp("^\\\\s*"+bt+"{3}").test(line))continue;
-    if(/^<!--/.test(line)||/^-->|^<\\/?[a-z]/i.test(line))continue;
+    if(new RegExp("^\\s*"+bt+"{3}").test(line))continue;
+    if(/^<!--/.test(line)||/^-->|^<\/?[a-z]/i.test(line))continue;
     if(line.includes("|")){
-      const cells=line.replace(/^\\|/,"").replace(/\\|$/,"").split("|").map(x=>x.trim());
+      const cells=line.replace(/^\|/,"").replace(/\|$/,"").split("|").map(x=>x.trim());
       if(cells.length>=2 && cells.some(x=>/^:?-{2,}:?$/.test(x)))continue;
       if(!header && cells.length>=2 && /tag|标签|english|英文/i.test(cells[0])){header=cells;continue;}
       if(cells.length>=2){
@@ -214,12 +214,12 @@ function parseMarkdownVocabulary(text){
         add(cells[ti>=0?ti:0],ai>=0?cells[ai].split(/[、,，;；]/):[],ci>=0?cells[ci]:"custom");continue;
       }
     }
-    line=line.replace(/^#{1,6}\\s+/,"").replace(/^[-*+]\\s+/,"").replace(/^>\\s*/,"").replace(/^\\d+[.)]\\s+/,"").trim();
+    line=line.replace(/^#{1,6}\s+/,"").replace(/^[-*+]\s+/,"").replace(/^>\s*/,"").replace(/^\d+[.)]\s+/,"").trim();
     if(!line)continue;
-    line=line.replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g,"$1").replace(/^\\*\\*|\\*\\*$/g,"").trim();
-    const m=line.match(/^(.+?)\\s*(?:\\|\\s*|\\s+[—–-]\\s+|\\s*[:：=]\\s+)(.+)$/);
+    line=line.replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/^\*\*|\*\*$/g,"").trim();
+    const m=line.match(/^(.+?)\s*(?:\|\s*|\s+[—–-]\s+|\s*[:：=]\s+)(.+)$/);
     if(m){
-      const left=m[1].replace(/^\\*+|\\*+$/g,"").trim(),right=m[2].replace(/^\\*+|\\*+$/g,"").trim();
+      const left=m[1].replace(/^\*+|\*+$/g,"").trim(),right=m[2].replace(/^\*+|\*+$/g,"").trim();
       if(left&&right&&!/^https?:/i.test(left))add(left,right.split(/[、,，;；]/));
     }else{
       const plain=line.replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
