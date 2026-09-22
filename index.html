@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#f5f3ef;--card:#fff;--ink:#171717;--muted:#777;--line:#ddd7cf;--accent:#b24b63;--soft:#f4dce2}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-main{max-width:1050px;margin:auto;padding:24px 16px 60px}.head{margin-bottom:16px}.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}.title{font-size:30px;font-weight:800;line-height:1.1}.sub{color:var(--muted);margin-top:6px}
+main{max-width:1080px;margin:auto;padding:24px 16px 60px}.head{margin-bottom:16px}.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}.title{font-size:30px;font-weight:800;line-height:1.1}.sub{color:var(--muted);margin-top:6px}
 .nav{display:flex;gap:8px;overflow:auto;margin:18px 0}.nav button{white-space:nowrap}.nav button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 .page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 5px 20px #00000008}
 label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:11px;font:inherit;outline:none}textarea{min-height:180px;resize:vertical}
@@ -15,76 +15,45 @@ label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{widt
 .intent{display:grid;grid-template-columns:1fr 1fr;gap:8px}.intent button.active,.cat.active{background:var(--soft);border-color:#c88495}
 .prompt{min-height:150px;white-space:pre-wrap;background:#171717;color:#f5f5f5;border-radius:12px;padding:14px;font:13px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12px;background:#f3f0eb;border-radius:99px;padding:4px 8px}.small{font-size:12px;color:var(--muted)}.hidden{display:none}.status{font-size:12px;color:var(--muted);margin-top:8px}
-.char-list{display:grid;gap:8px}.char{border:1px solid var(--line);border-radius:10px;padding:10px}.char b{display:block}
+.char-list,.save-list{display:grid;gap:8px}.char,.save-item{border:1px solid var(--line);border-radius:11px;padding:11px}.char b,.save-item b{display:block}
 .toolbar{display:grid;grid-template-columns:1fr 180px;gap:8px}.catbar{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.cat{font-size:12px;padding:6px 9px}
 .vocab-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.vocab{border:1px solid var(--line);border-radius:11px;padding:11px;cursor:pointer}.vocab.selected{border-color:#c88495;background:#fff8fa}.vocab-top{display:flex;align-items:center;gap:8px}.vocab input{width:auto}.tag{font-weight:700}.meta{font-size:11px;color:var(--muted);margin-top:4px}.alias{font-size:12px;color:#666;margin-top:5px}
-@media(max-width:760px){.grid,.toolbar{grid-template-columns:1fr}.title{font-size:25px}.vocab-grid{grid-template-columns:1fr}}
+.save-layout{display:grid;grid-template-columns:320px 1fr;gap:16px}.save-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.save-tag{font-size:11px;background:#f3f0eb;border-radius:99px;padding:3px 7px}.save-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+@media(max-width:760px){.grid,.toolbar,.save-layout{grid-template-columns:1fr}.title{font-size:25px}.vocab-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <main>
-<header class="head"><div class="eyebrow">NAI PROMPT COMPILER · V0.2</div><div class="title">自然语言 → NAI Prompt</div><div class="sub">离线优先：自然语言编译、角色管理、词库选择三部分独立工作。</div></header>
-
+<header class="head"><div class="eyebrow">NAI PROMPT COMPILER · V0.3</div><div class="title">自然语言 → NAI Prompt</div><div class="sub">离线优先：自然语言编译、角色管理、词库选择、提示词资料库。</div></header>
 <nav class="nav">
-<button class="active" data-page="translatePage">① 自然语言转化</button>
-<button data-page="characterPage">② 角色管理</button>
-<button data-page="vocabPage">③ 词库预览</button>
+<button class="active" data-page="translatePage">① 自然语言转化</button><button data-page="characterPage">② 角色管理</button><button data-page="vocabPage">③ 词库预览</button><button data-page="libraryPage">④ 提示词资料库</button>
 </nav>
 
-<section id="translatePage" class="page active">
-<div class="grid">
-<div class="card">
-<label for="input">自然语言描述</label>
-<textarea id="input" placeholder="例如：黑发男生穿黑西装撑伞，白发女生穿白裙拿着花，两人在雨夜街道上对视，我想要有张力的电影感构图"></textarea>
-<div class="row"><button class="primary" id="translate">生成 Prompt</button><button id="clear">清空</button></div>
-<div style="margin-top:18px"><label>视觉意图</label><div class="intent">
-<button data-intent="none" class="active">自然</button><button data-intent="tension">张力</button><button data-intent="cinematic">电影感</button><button data-intent="lonely">孤独感</button>
-</div></div>
+<section id="translatePage" class="page active"><div class="grid"><div class="card">
+<label for="input">自然语言描述</label><textarea id="input" placeholder="例如：黑发男生穿黑西装撑伞，白发女生穿白裙拿着花，两人在雨夜街道上对视，我想要有张力的电影感构图"></textarea>
+<div class="row"><button class="primary" id="translate">生成 Prompt</button><button id="clear">清空</button><button id="saveCurrent">保存当前提示词</button></div>
+<div style="margin-top:18px"><label>视觉意图</label><div class="intent"><button data-intent="none" class="active">自然</button><button data-intent="tension">张力</button><button data-intent="cinematic">电影感</button><button data-intent="lonely">孤独感</button></div></div>
 <div style="margin-top:18px"><label>生成结果</label><div id="prompt" class="prompt">等待输入……</div><div class="row"><button id="copy">复制 Prompt</button></div><div id="status" class="status"></div></div>
-</div>
-<aside class="card">
-<label>当前选用词库标签</label><div id="selectedTags" class="chips"><span class="small">暂无手动选择</span></div>
-<div style="margin-top:18px"><label>角色概览</label><div id="charMini" class="char-list"></div></div>
-</aside>
-</div>
-</section>
+</div><aside class="card"><label>当前选用词库标签</label><div id="selectedTags" class="chips"><span class="small">暂无手动选择</span></div><div style="margin-top:18px"><label>角色概览</label><div id="charMini" class="char-list"></div></div></aside></div></section>
 
-<section id="characterPage" class="page">
-<div class="card">
-<label>角色管理器</label>
-<div class="small">角色资料保存在当前浏览器。后续会加入锁定属性与临时场景覆盖，避免场景描述永久改写角色。</div>
-<div id="chars" class="char-list" style="margin-top:12px"></div>
-<div class="row"><button class="primary" id="newChar">＋ 新建角色</button></div>
-<div id="editor" class="hidden" style="margin-top:14px">
-<input id="cname" placeholder="角色名称">
-<div class="row"><input id="cgender" placeholder="性别，例如：男"></div>
-<div class="row"><input id="chair" placeholder="发色/发型，例如：黑色短发"></div>
-<div class="row"><input id="ceye" placeholder="眼睛，例如：红色眼睛"></div>
-<div class="row"><input id="ccloth" placeholder="固定服装（可留空）"></div>
-<div class="row"><input id="cfeature" placeholder="其他特征（可留空）"></div>
-<div class="row"><button class="primary" id="saveChar">保存角色</button><button id="cancelChar">取消</button></div>
-</div>
-</div>
-</section>
+<section id="characterPage" class="page"><div class="card"><label>角色管理器</label><div class="small">角色资料保存在当前浏览器。后续会加入锁定属性与临时场景覆盖，避免场景描述永久改写角色。</div><div id="chars" class="char-list" style="margin-top:12px"></div><div class="row"><button class="primary" id="newChar">＋ 新建角色</button></div><div id="editor" class="hidden" style="margin-top:14px">
+<input id="cname" placeholder="角色名称"><div class="row"><input id="cgender" placeholder="性别，例如：男"></div><div class="row"><input id="chair" placeholder="发色/发型，例如：黑色短发"></div><div class="row"><input id="ceye" placeholder="眼睛，例如：红色眼睛"></div><div class="row"><input id="ccloth" placeholder="固定服装（可留空）"></div><div class="row"><input id="cfeature" placeholder="其他特征（可留空）"></div><div class="row"><button class="primary" id="saveChar">保存角色</button><button id="cancelChar">取消</button></div></div></div></section>
 
-<section id="vocabPage" class="page">
-<div class="card">
-<label>NAI 词库预览</label>
-<div class="small">可以浏览本地词库并手动选词。勾选后的标签会加入下一次 Prompt 编译结果。当前版本使用项目内的本地适配器，不依赖在线 API。</div>
-<div class="toolbar" style="margin-top:14px"><input id="vsearch" placeholder="搜索英文标签或中文别名……"><select id="vsource"><option value="all">全部来源</option><option value="local">项目适配器</option></select></div>
-<div id="catbar" class="catbar"></div>
-<div class="row"><button id="clearSelected">清除已选</button><button class="primary" id="applySelected">应用到编译器</button></div>
-<div id="vocabCount" class="status"></div>
-<div id="vocabGrid" class="vocab-grid" style="margin-top:12px"></div>
-</div>
-</section>
+<section id="vocabPage" class="page"><div class="card"><label>NAI 词库预览</label><div class="small">浏览本地词库并手动选词。勾选后的标签会加入下一次 Prompt 编译结果。</div><div class="toolbar" style="margin-top:14px"><input id="vsearch" placeholder="搜索英文标签或中文别名……"><select id="vsource"><option value="all">全部来源</option><option value="local">项目适配器</option></select></div><div id="catbar" class="catbar"></div><div class="row"><button id="clearSelected">清除已选</button><button class="primary" id="applySelected">应用到编译器</button></div><div id="vocabCount" class="status"></div><div id="vocabGrid" class="vocab-grid" style="margin-top:12px"></div></div></section>
+
+<section id="libraryPage" class="page"><div class="save-layout"><div class="card">
+<label>提示词资料库</label><div class="small">保存以前写过的提示词，也可以直接手动录入。每条资料独立保存在当前浏览器，不依赖 API。</div>
+<div style="margin-top:14px"><input id="saveTitle" placeholder="名称，例如：雨夜双人构图"></div>
+<div style="margin-top:10px"><input id="saveTags" placeholder="画面标签，用逗号分隔，例如：雨夜, 双人, 对视, 张力"></div>
+<div style="margin-top:10px"><label>自然语言</label><textarea id="saveNatural" style="min-height:120px" placeholder="记录当时使用的中文描述……"></textarea></div>
+<div style="margin-top:10px"><label>NAI Prompt</label><textarea id="saveNai" style="min-height:160px" placeholder="记录最终的 NAI 标签……"></textarea></div>
+<div class="row"><button class="primary" id="saveEntry">保存资料</button><button id="clearEntry">清空表单</button></div><div id="libraryStatus" class="status"></div>
+</div><div class="card"><label>已保存的提示词</label><div class="toolbar" style="margin-top:10px"><input id="librarySearch" placeholder="搜索名称、画面标签、自然语言或 NAI 标签……"><select id="libraryFilter"><option value="all">全部</option><option value="tag">按画面标签</option><option value="nai">按 NAI Prompt</option></select></div><div id="saveList" class="save-list" style="margin-top:12px"></div></div></div></section>
 </main>
-
 <script>
-const KEY="nai_prompt_characters_v01", VKEY="nai_prompt_selected_vocab_v01";
-let chars=JSON.parse(localStorage.getItem(KEY)||"[]"), editing=null, intent="none", vocabulary=[], selected=new Set(JSON.parse(localStorage.getItem(VKEY)||"[]")), activeCategory="all";
-const $=s=>document.querySelector(s);
-const esc=s=>String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const KEY="nai_prompt_characters_v01",VKEY="nai_prompt_selected_vocab_v01",LKEY="nai_prompt_library_v01";
+let chars=JSON.parse(localStorage.getItem(KEY)||"[]"),editing=null,intent="none",vocabulary=[],selected=new Set(JSON.parse(localStorage.getItem(VKEY)||"[]")),activeCategory="all",library=JSON.parse(localStorage.getItem(LKEY)||"[]"),editingSave=null;
+const $=s=>document.querySelector(s),esc=s=>String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function saveChars(){localStorage.setItem(KEY,JSON.stringify(chars));renderChars();renderMini()}
 function renderChars(){const box=$("#chars");box.innerHTML=chars.length?chars.map((c,i)=>'<div class="char"><b>'+esc(c.name)+'</b><div class="small">'+esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")+'</div><div class="row"><button onclick="editChar('+i+')">编辑</button><button class="danger" onclick="delChar('+i+')">删除</button></div></div>').join(""):'<div class="small">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>'}
 function renderMini(){const box=$("#charMini");box.innerHTML=chars.length?chars.map(c=>'<div class="char"><b>'+esc(c.name)+'</b><div class="small">'+esc([c.gender,c.hair,c.eye].filter(Boolean).join(" · ")||"外貌未设置")+'</div></div>').join(""):'<div class="small">暂无角色</div>'}
@@ -93,42 +62,29 @@ window.delChar=i=>{chars.splice(i,1);saveChars()}
 $("#newChar").onclick=()=>{editing=null;["cname","cgender","chair","ceye","ccloth","cfeature"].forEach(id=>$("#"+id).value="");$("#editor").classList.remove("hidden")}
 $("#cancelChar").onclick=()=>$("#editor").classList.add("hidden")
 $("#saveChar").onclick=()=>{const c={name:$("#cname").value.trim(),gender:$("#cgender").value.trim(),hair:$("#chair").value.trim(),eye:$("#ceye").value.trim(),cloth:$("#ccloth").value.trim(),feature:$("#cfeature").value.trim()};if(!c.name)return;editing===null?chars.push(c):chars[editing]=c;saveChars();$("#editor").classList.add("hidden")}
-
 document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-page]").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("#"+b.dataset.page).classList.add("active")});
 document.querySelectorAll("[data-intent]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-intent]").forEach(x=>x.classList.remove("active"));b.classList.add("active");intent=b.dataset.intent});
-
 fetch("data/nai-vocabulary.json").then(r=>r.json()).then(d=>{vocabulary=d.entries||[];renderVocab();$("#status").textContent="词库已加载："+vocabulary.length+" 条。"}).catch(()=>$("#status").textContent="词库加载失败，使用内置规则。");
-
-function categories(){return ["all",...new Set(vocabulary.map(e=>e.category).filter(Boolean))]}
+function categories(){return["all",...new Set(vocabulary.map(e=>e.category).filter(Boolean))]}
 function renderCats(){const map={all:"全部",appearance:"外貌",clothing:"服装",action:"动作",pose:"姿势",environment:"环境",composition:"构图",camera:"镜头",lighting:"光线"};$("#catbar").innerHTML=categories().map(c=>'<button class="cat '+(c===activeCategory?"active":"")+'" data-cat="'+esc(c)+'">'+(map[c]||c)+'</button>').join("");document.querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;renderVocab()})}
-function renderVocab(){renderCats();const q=$("#vsearch").value.trim().toLowerCase();const list=vocabulary.filter(e=>(activeCategory==="all"||e.category===activeCategory)&&(!q||[e.canonical_tag,...(e.aliases||[])].join(" ").toLowerCase().includes(q)));$("#vocabCount").textContent="显示 "+list.length+" 条 · 已选 "+selected.size+" 条";$("#vocabGrid").innerHTML=list.map(e=>'<div class="vocab '+(selected.has(e.canonical_tag)?"selected":"")+'" data-tag="'+esc(e.canonical_tag)+'"><div class="vocab-top"><input type="checkbox" '+(selected.has(e.canonical_tag)?"checked":"")+'><span class="tag">'+esc(e.canonical_tag)+'</span></div><div class="meta">'+esc(e.category||"")+'</div><div class="alias">'+esc((e.aliases||[]).join(" · ")||"无中文别名")+'</div></div>').join("");document.querySelectorAll(".vocab").forEach(el=>el.onclick=ev=>{if(ev.target.tagName==="INPUT")return;toggleTag(el.dataset.tag)});document.querySelectorAll(".vocab input").forEach((el,i)=>el.onchange=()=>toggleTag(list[i].canonical_tag))}
+function renderVocab(){renderCats();const q=$("#vsearch").value.trim().toLowerCase(),list=vocabulary.filter(e=>(activeCategory==="all"||e.category===activeCategory)&&(!q||[e.canonical_tag,...(e.aliases||[])].join(" ").toLowerCase().includes(q)));$("#vocabCount").textContent="显示 "+list.length+" 条 · 已选 "+selected.size+" 条";$("#vocabGrid").innerHTML=list.map(e=>'<div class="vocab '+(selected.has(e.canonical_tag)?"selected":"")+'" data-tag="'+esc(e.canonical_tag)+'"><div class="vocab-top"><input type="checkbox" '+(selected.has(e.canonical_tag)?"checked":"")+'><span class="tag">'+esc(e.canonical_tag)+'</span></div><div class="meta">'+esc(e.category||"")+'</div><div class="alias">'+esc((e.aliases||[]).join(" · ")||"无中文别名")+'</div></div>').join("");document.querySelectorAll(".vocab").forEach(el=>el.onclick=ev=>{if(ev.target.tagName==="INPUT")return;toggleTag(el.dataset.tag)});document.querySelectorAll(".vocab input").forEach((el,i)=>el.onchange=()=>toggleTag(list[i].canonical_tag))}
 function toggleTag(tag){selected.has(tag)?selected.delete(tag):selected.add(tag);localStorage.setItem(VKEY,JSON.stringify([...selected]));renderVocab();renderSelected()}
 function renderSelected(){$("#selectedTags").innerHTML=selected.size?[...selected].map(t=>'<span class="chip">'+esc(t)+'</span>').join(""):'<span class="small">暂无手动选择</span>'}
-$("#vsearch").oninput=renderVocab;
-$("#clearSelected").onclick=()=>{selected.clear();localStorage.setItem(VKEY,"[]");renderVocab();renderSelected()}
-$("#applySelected").onclick=()=>{showPage("translatePage");$("#status").textContent="已应用 "+selected.size+" 个手选标签。"}
-function showPage(id){document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id))}
-
+$("#vsearch").oninput=renderVocab;$("#clearSelected").onclick=()=>{selected.clear();localStorage.setItem(VKEY,"[]");renderVocab();renderSelected()};$("#applySelected").onclick=()=>{showPage("translatePage");$("#status").textContent="已应用 "+selected.size+" 个手选标签。"};function showPage(id){document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id))}
 function matchVocabulary(text){return vocabulary.filter(e=>[e.canonical_tag,...(e.aliases||[])].some(x=>x&&text.toLowerCase().includes(String(x).toLowerCase())))}
-function parse(text){
- let tags=[], add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};
- const hits=matchVocabulary(text);hits.forEach(e=>add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1));
- selected.forEach(t=>add(t,1.08));
- if(/两个|2个|两名|两人|一男一女/.test(text))add("2people");else if(/女生|女孩|女人|女性/.test(text))add("1girl");else if(/男生|男孩|男人|男性/.test(text))add("1boy");
- if(/独自|一个人|单独|solo/.test(text))add("solo");
- const active=chars.find(c=>c.name&&text.includes(c.name));
- if(active){tags=tags.filter(x=>!["1boy","1girl","solo"].includes(x.tag));add(active.gender==="男"?"1boy":active.gender==="女"?"1girl":"1person",1.05);if(active.hair)add(active.hair,1.2);if(active.eye)add(active.eye,1.2);if(active.feature)add(active.feature,1.12);if(active.cloth)add(active.cloth,1.1);if(!active.hair&&!active.eye&&!active.feature)add("[APPEARANCE]")}
- if((/男生|男人|男性|男孩|女生|女孩|女人|女性/.test(text))&&!hits.some(e=>e.category==="appearance")&&!active)add("[APPEARANCE]");
- if(intent==="tension")[["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]].forEach(x=>add(x[0],x[1]));
- if(intent==="cinematic")[["cinematic composition",1.08],["cinematic lighting",1.08],["depth of field",1.06],["dramatic perspective",1.04]].forEach(x=>add(x[0],x[1]));
- if(intent==="lonely")[["wide shot",1.06],["off-center composition",1.08],["negative space",1.12],["soft atmospheric lighting",1.04]].forEach(x=>add(x[0],x[1]));
- const conflicts=[];const a=tags.map(x=>x.tag);if(a.includes("standing")&&a.includes("sitting"))conflicts.push("standing / sitting");if(conflicts.length)$("#status").textContent="检测到动作冲突："+conflicts.join("、")+"；当前版本保守保留，后续会按角色作用域消解。";
- return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
-}
-$("#translate").onclick=()=>{$("#prompt").textContent=parse($("#input").value.trim())||"请输入自然语言描述。";$("#status").textContent="离线规则编译：已使用本地词库、角色资料与手选标签。"}
-$("#clear").onclick=()=>{$("#input").value="";$("#prompt").textContent="等待输入……";$("#status").textContent=""}
-$("#copy").onclick=async()=>{await navigator.clipboard.writeText($("#prompt").textContent);$("#status").textContent="已复制"}
-renderChars();renderMini();renderSelected();
+function parse(text){let tags=[],add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};const hits=matchVocabulary(text);hits.forEach(e=>add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1));selected.forEach(t=>add(t,1.08));if(/两个|2个|两名|两人|一男一女/.test(text))add("2people");else if(/女生|女孩|女人|女性/.test(text))add("1girl");else if(/男生|男孩|男人|男性/.test(text))add("1boy");if(/独自|一个人|单独|solo/.test(text))add("solo");const active=chars.find(c=>c.name&&text.includes(c.name));if(active){tags=tags.filter(x=>!["1boy","1girl","solo"].includes(x.tag));add(active.gender==="男"?"1boy":active.gender==="女"?"1girl":"1person",1.05);if(active.hair)add(active.hair,1.2);if(active.eye)add(active.eye,1.2);if(active.feature)add(active.feature,1.12);if(active.cloth)add(active.cloth,1.1);if(!active.hair&&!active.eye&&!active.feature)add("[APPEARANCE]")}if((/男生|男人|男性|男孩|女生|女孩|女人|女性/.test(text))&&!hits.some(e=>e.category==="appearance")&&!active)add("[APPEARANCE]");if(intent==="tension")[["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]].forEach(x=>add(x[0],x[1]));if(intent==="cinematic")[["cinematic composition",1.08],["cinematic lighting",1.08],["depth of field",1.06],["dramatic perspective",1.04]].forEach(x=>add(x[0],x[1]));if(intent==="lonely")[["wide shot",1.06],["off-center composition",1.08],["negative space",1.12],["soft atmospheric lighting",1.04]].forEach(x=>add(x[0],x[1]));const conflicts=[],a=tags.map(x=>x.tag);if(a.includes("standing")&&a.includes("sitting"))conflicts.push("standing / sitting");if(conflicts.length)$("#status").textContent="检测到动作冲突："+conflicts.join("、")+"；当前版本保守保留，后续会按角色作用域消解。";return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ")}
+$("#translate").onclick=()=>{$("#prompt").textContent=parse($("#input").value.trim())||"请输入自然语言描述。";$("#status").textContent="离线规则编译：已使用本地词库、角色资料与手选标签。"};$("#clear").onclick=()=>{$("#input").value="";$("#prompt").textContent="等待输入……";$("#status").textContent=""};$("#copy").onclick=async()=>{await navigator.clipboard.writeText($("#prompt").textContent);$("#status").textContent="已复制"};
+
+function resetSaveForm(){editingSave=null;$("#saveTitle").value="";$("#saveTags").value="";$("#saveNatural").value="";$("#saveNai").value=""}
+function persistLibrary(){localStorage.setItem(LKEY,JSON.stringify(library));renderLibrary()}
+function renderLibrary(){const q=$("#librarySearch").value.trim().toLowerCase(),filter=$("#libraryFilter").value,list=library.filter(e=>{const all=[e.title,e.tags,e.natural,e.nai].join(" ").toLowerCase();if(!q)return true;if(filter==="tag")return String(e.tags||"").toLowerCase().includes(q);if(filter==="nai")return String(e.nai||"").toLowerCase().includes(q);return all.includes(q)});$("#saveList").innerHTML=list.length?list.map(e=>'<div class="save-item"><b>'+esc(e.title||"未命名提示词")+'</b><div class="small">'+esc(e.updatedAt||"")+'</div><div class="save-tags">'+(e.tags||"").split(/[,，]/).filter(Boolean).map(t=>'<span class="save-tag">'+esc(t.trim())+'</span>').join("")+'</div><div class="small" style="margin-top:8px"><b>自然语言：</b>'+esc(e.natural||"未记录")+'</div><div class="prompt" style="min-height:0;margin-top:8px;font-size:12px">'+esc(e.nai||"未记录")+'</div><div class="save-actions"><button onclick="loadSave(\''+e.id+'\')">载入编辑</button><button onclick="useSave(\''+e.id+'\')">载入编译器</button><button class="danger" onclick="deleteSave(\''+e.id+'\')">删除</button></div></div>').join(""):'<div class="small">暂无保存内容。你可以先在这里录入旧提示词，或从第一页保存当前结果。</div>'}
+window.loadSave=id=>{const e=library.find(x=>x.id===id);if(!e)return;editingSave=id;$("#saveTitle").value=e.title||"";$("#saveTags").value=e.tags||"";$("#saveNatural").value=e.natural||"";$("#saveNai").value=e.nai||"";$("#libraryStatus").textContent="正在编辑已保存资料。"}
+window.useSave=id=>{const e=library.find(x=>x.id===id);if(!e)return;$("#input").value=e.natural||"";$("#prompt").textContent=e.nai||"等待输入……";showPage("translatePage");$("#status").textContent="已载入资料："+(e.title||"未命名提示词")}
+window.deleteSave=id=>{library=library.filter(x=>x.id!==id);persistLibrary()}
+$("#saveEntry").onclick=()=>{const title=$("#saveTitle").value.trim()||"未命名提示词",entry={id:editingSave||("p_"+Date.now()),title,tags:$("#saveTags").value.trim(),natural:$("#saveNatural").value.trim(),nai:$("#saveNai").value.trim(),updatedAt:new Date().toLocaleString("zh-CN")};if(editingSave){const i=library.findIndex(x=>x.id===editingSave);if(i>=0)library[i]=entry}else library.unshift(entry);persistLibrary();$("#libraryStatus").textContent="已保存到本地资料库。";resetSaveForm()}
+$("#clearEntry").onclick=()=>{resetSaveForm();$("#libraryStatus").textContent=""};$("#librarySearch").oninput=renderLibrary;$("#libraryFilter").onchange=renderLibrary;
+$("#saveCurrent").onclick=()=>{const natural=$("#input").value.trim(),nai=$("#prompt").textContent==="等待输入……"?"":$("#prompt").textContent;$("#saveTitle").value=natural.slice(0,24)||"未命名提示词";$("#saveNatural").value=natural;$("#saveNai").value=nai;showPage("libraryPage");renderLibrary();$("#libraryStatus").textContent="已把当前编译内容带入资料库表单，请确认后保存。"}
+renderChars();renderMini();renderSelected();renderLibrary();
 </script>
 </body>
 </html>
