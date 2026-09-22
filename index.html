@@ -36,7 +36,7 @@ label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{widt
 <div style="margin-top:18px"><label>生成结果</label><div id="prompt" class="prompt">等待输入……</div><div class="row"><button id="copy">复制 Prompt</button></div><div id="status" class="status"></div></div>
 </div><aside class="card"><label>当前选用词库标签</label><div id="selectedTags" class="chips"><span class="small">暂无手动选择</span></div><div style="margin-top:18px"><label>角色概览</label><div id="charMini" class="char-list"></div></div></aside></div></section>
 
-<section id="characterPage" class="page"><div class="card"><label>角色管理器</label><div class="small">角色资料保存在当前浏览器。后续会加入锁定属性与临时场景覆盖，避免场景描述永久改写角色。</div><div id="chars" class="char-list" style="margin-top:12px"></div><div class="row"><button class="primary" id="newChar">＋ 新建角色</button></div><div id="editor" class="hidden" style="margin-top:14px">
+<section id="characterPage" class="page"><div class="card"><label>角色管理器</label><div class="small">角色资料保存在当前浏览器。锁定属性不会被场景覆盖；场景描述中的临时服装、动作和状态只作用于当前编译。</div><div id="chars" class="char-list" style="margin-top:12px"></div><div class="row"><button class="primary" id="newChar">＋ 新建角色</button></div><div id="editor" class="hidden" style="margin-top:14px">
 <input id="cname" placeholder="角色名称"><div class="row"><input id="cgender" placeholder="性别，例如：男"></div><div class="row"><input id="chair" placeholder="发色/发型，例如：黑色短发"></div><div class="row"><input id="ceye" placeholder="眼睛，例如：红色眼睛"></div><div class="row"><input id="ccloth" placeholder="固定服装（可留空）"></div><div class="row"><input id="cfeature" placeholder="其他特征（可留空）"></div><div class="row"><button class="primary" id="saveChar">保存角色</button><button id="cancelChar">取消</button></div></div></div></section>
 
 <section id="vocabPage" class="page"><div class="card"><label>NAI 词库预览</label><div class="small">浏览本地词库并手动选词。勾选后的标签会加入下一次 Prompt 编译结果。</div><div class="toolbar" style="margin-top:14px"><input id="vsearch" placeholder="搜索英文标签或中文别名……"><select id="vsource"><option value="all">全部来源</option><option value="local">项目适配器</option></select></div><div id="catbar" class="catbar"></div><div class="row"><button id="clearSelected">清除已选</button><button class="primary" id="applySelected">应用到编译器</button></div><div id="vocabCount" class="status"></div><div id="vocabGrid" class="vocab-grid" style="margin-top:12px"></div></div></section>
@@ -68,13 +68,13 @@ const KEY="nai_prompt_characters_v01",VKEY="nai_prompt_selected_vocab_v01",LKEY=
 let chars=JSON.parse(localStorage.getItem(KEY)||"[]"),editing=null,intent="none",vocabulary=[],customVocabulary=JSON.parse(localStorage.getItem(CKEY)||"[]"),selected=new Set(JSON.parse(localStorage.getItem(VKEY)||"[]")),activeCategory="all",library=JSON.parse(localStorage.getItem(LKEY)||"[]"),editingSave=null;
 const $=s=>document.querySelector(s),esc=s=>String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function saveChars(){localStorage.setItem(KEY,JSON.stringify(chars));renderChars();renderMini()}
-function renderChars(){const box=$("#chars");box.innerHTML=chars.length?chars.map((c,i)=>'<div class="char"><b>'+esc(c.name)+'</b><div class="small">'+esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")+'</div><div class="row"><button onclick="editChar('+i+')">编辑</button><button class="danger" onclick="delChar('+i+')">删除</button></div></div>').join(""):'<div class="small">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>'}
+function renderChars(){const box=$("#chars");box.innerHTML=chars.length?chars.map((c,i)=>'<div class="char"><b>'+esc(c.name)+'</b><div class="small">'+esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")+(c.locked?' <span class="small">· 已锁定</span>':"")+'</div><div class="row"><button onclick="editChar('+i+')">编辑</button><button class="danger" onclick="delChar('+i+')">删除</button></div></div>').join(""):'<div class="small">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>'}
 function renderMini(){const box=$("#charMini");box.innerHTML=chars.length?chars.map(c=>'<div class="char"><b>'+esc(c.name)+'</b><div class="small">'+esc([c.gender,c.hair,c.eye].filter(Boolean).join(" · ")||"外貌未设置")+'</div></div>').join(""):'<div class="small">暂无角色</div>'}
-window.editChar=i=>{editing=i;const c=chars[i];$("#cname").value=c.name;$("#cgender").value=c.gender;$("#chair").value=c.hair;$("#ceye").value=c.eye;$("#ccloth").value=c.cloth;$("#cfeature").value=c.feature;$("#editor").classList.remove("hidden")}
+window.editChar=i=>{editing=i;const c=chars[i];$("#cname").value=c.name;$("#cgender").value=c.gender;$("#chair").value=c.hair;$("#ceye").value=c.eye;$("#ccloth").value=c.cloth;$("#cfeature").value=c.feature;$("#clock").checked=!!c.locked;$("#editor").classList.remove("hidden")}
 window.delChar=i=>{chars.splice(i,1);saveChars()}
-$("#newChar").onclick=()=>{editing=null;["cname","cgender","chair","ceye","ccloth","cfeature"].forEach(id=>$("#"+id).value="");$("#editor").classList.remove("hidden")}
+$("#newChar").onclick=()=>{editing=null;["cname","cgender","chair","ceye","ccloth","cfeature"].forEach(id=>$("#"+id).value="");$("#clock").checked=false;$("#editor").classList.remove("hidden")}
 $("#cancelChar").onclick=()=>$("#editor").classList.add("hidden")
-$("#saveChar").onclick=()=>{const c={name:$("#cname").value.trim(),gender:$("#cgender").value.trim(),hair:$("#chair").value.trim(),eye:$("#ceye").value.trim(),cloth:$("#ccloth").value.trim(),feature:$("#cfeature").value.trim()};if(!c.name)return;editing===null?chars.push(c):chars[editing]=c;saveChars();$("#editor").classList.add("hidden")}
+$("#saveChar").onclick=()=>{const c={name:$("#cname").value.trim(),gender:$("#cgender").value.trim(),hair:$("#chair").value.trim(),eye:$("#ceye").value.trim(),cloth:$("#ccloth").value.trim(),feature:$("#cfeature").value.trim(),locked:$("#clock").checked};if(!c.name)return;editing===null?chars.push(c):chars[editing]=c;saveChars();$("#editor").classList.add("hidden")}
 document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-page]").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("#"+b.dataset.page).classList.add("active")});
 document.querySelectorAll("[data-intent]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-intent]").forEach(x=>x.classList.remove("active"));b.classList.add("active");intent=b.dataset.intent});
 fetch("data/nai-vocabulary.json").then(r=>r.json()).then(d=>{vocabulary=d.entries||[];renderVocab();$("#status").textContent="词库已加载："+vocabulary.length+" 条。"}).catch(()=>$("#status").textContent="词库加载失败，使用内置规则。");
@@ -87,42 +87,51 @@ function renderSelected(){$("#selectedTags").innerHTML=selected.size?[...selecte
 $("#vsearch").oninput=renderVocab;$("#clearSelected").onclick=()=>{selected.clear();localStorage.setItem(VKEY,"[]");renderVocab();renderSelected()};$("#applySelected").onclick=()=>{showPage("translatePage");$("#status").textContent="已应用 "+selected.size+" 个手选标签。"};function showPage(id){document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id))}
 function matchVocabulary(text){return allVocabulary().filter(e=>[e.canonical_tag,...(e.aliases||[])].some(x=>x&&text.toLowerCase().includes(String(x).toLowerCase())))}
 function parse(text){
-  let tags=[],add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};
-  const lower=text.toLowerCase();
+  const tags=[],add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};
+  const conflicts=[];
   const hits=matchVocabulary(text);
-  const matchedTags=hits.map(e=>e.canonical_tag);
-
-  // 先识别已登记角色；多个角色时分别收集其附近的属性、动作和道具。
   const matchedChars=chars.filter(c=>c.name&&text.includes(c.name));
-  const genderWord=(s)=>/男生|男孩|男人|男性/.test(s)?"1boy":/女生|女孩|女人|女性/.test(s)?"1girl":null;
-  const appearanceFor=(c)=>{
-    const out=[];
-    if(c.hair)out.push(c.hair);
-    if(c.eye)out.push(c.eye);
-    if(c.cloth)out.push(c.cloth);
-    if(c.feature)out.push(c.feature);
+  const genericPerson=/男生|男孩|男人|男性|女生|女孩|女人|女性|角色|人物/.test(text);
+
+  const appearanceFor=c=>[c.hair,c.eye,c.cloth,c.feature].filter(Boolean);
+  const scopeFor=(c,index)=>{
+    const positions=matchedChars.map(x=>text.indexOf(x.name));
+    const pos=positions[index], next=positions.filter(p=>p>pos);
+    const end=next.length?Math.min(...next):text.length;
+    return text.slice(Math.max(0,pos-24),Math.min(text.length,end+60));
+  };
+  const classifyScope=(scope)=>{
+    const out={actions:[],poses:[],clothing:[],appearance:[]};
+    matchVocabulary(scope).forEach(e=>{
+      if(e.category==="action")out.actions.push(e.canonical_tag);
+      else if(e.category==="pose")out.poses.push(e.canonical_tag);
+      else if(e.category==="clothing")out.clothing.push(e.canonical_tag);
+      else if(e.category==="appearance")out.appearance.push(e.canonical_tag);
+    });
     return out;
   };
-  const scopeFor=(c)=>{
-    const pos=text.indexOf(c.name);
-    const nextPositions=matchedChars.map(x=>text.indexOf(x.name)).filter(p=>p>pos);
-    const next=nextPositions.length?Math.min(...nextPositions):text.length;
-    return text.slice(Math.max(0,pos-28),Math.min(text.length,next+48));
+  const addScoped=(c,scope,index)=>{
+    const base=appearanceFor(c);
+    // 锁定属性优先；未锁定属性允许被本次场景覆盖，但不会写回角色档案。
+    const scoped=classifyScope(scope);
+    const temporary=scoped.clothing.length||scoped.appearance.length;
+    if(c.locked||!temporary)base.forEach((x,i)=>add(x,i<2?1.22:1.12));
+    else{
+      const overridden=new Set(scoped.clothing.concat(scoped.appearance));
+      base.forEach(x=>{if(!overridden.has(x))add(x,1.1)});
+    }
+    scoped.clothing.concat(scoped.appearance).forEach(x=>add(x,1.2));
+    scoped.actions.concat(scoped.poses).forEach(x=>add(x,1.14));
+    const gender=/男生|男孩|男人|男性/.test(scope)?"1boy":/女生|女孩|女人|女性/.test(scope)?"1girl":null;
+    if(gender)add(gender,1.04);
+
+    if(scoped.actions.includes("standing")&&scoped.actions.includes("sitting"))conflicts.push(c.name+": standing / sitting");
+    if(scoped.actions.includes("walking")&&scoped.actions.includes("running"))conflicts.push(c.name+": walking / running");
   };
 
   if(matchedChars.length){
     add(matchedChars.length===2?"2people":matchedChars.length===1?(matchedChars[0].gender==="男"?"1boy":matchedChars[0].gender==="女"?"1girl":"1person"):matchedChars.length+"people",1.05);
-
-    matchedChars.forEach((c,index)=>{
-      const scope=scopeFor(c);
-      appearanceFor(c).forEach((x,i)=>add(x,i<2?1.2:1.12));
-      const scopeHits=matchVocabulary(scope);
-      scopeHits.forEach(e=>{
-        if(["appearance","clothing","action","pose"].includes(e.category)) add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1.08);
-      });
-      const gw=genderWord(scope);
-      if(gw)add(gw,1.04);
-    });
+    matchedChars.forEach((c,i)=>addScoped(c,scopeFor(c,i),i));
   }else{
     hits.forEach(e=>add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1));
     if(/两个|2个|两名|两人|一男一女/.test(text))add("2people");
@@ -132,12 +141,8 @@ function parse(text){
   }
 
   selected.forEach(t=>add(t,1.08));
+  if(genericPerson&&!matchedChars.length&&!hits.some(e=>e.category==="appearance"))add("[APPEARANCE]");
 
-  // 未登记角色仍保留外貌占位，不凭空捏造头发、眼睛等属性。
-  const hasPerson=/男生|男孩|男人|男性|女生|女孩|女人|女性|角色|人物/.test(text);
-  if(hasPerson&&!matchedChars.length&&!hits.some(e=>e.category==="appearance"))add("[APPEARANCE]");
-
-  // 视觉意图自动补充：用户说“张力/电影感/孤独感”时也能进入同一编译流程。
   const effectiveIntent=intent!=="none"?intent:
     (/张力|紧张|压迫感|冲突感/.test(text)?"tension":
      /电影感|电影般|镜头感|影视感/.test(text)?"cinematic":
@@ -147,23 +152,16 @@ function parse(text){
     ["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],
     ["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]
   ].forEach(x=>add(x[0],x[1]));
-
   if(effectiveIntent==="cinematic")[
     ["cinematic composition",1.08],["cinematic lighting",1.08],
     ["depth of field",1.06],["dramatic perspective",1.04]
   ].forEach(x=>add(x[0],x[1]));
-
   if(effectiveIntent==="lonely")[
     ["wide shot",1.06],["off-center composition",1.08],
     ["negative space",1.12],["soft atmospheric lighting",1.04]
   ].forEach(x=>add(x[0],x[1]));
 
-  // 冲突检测：当前先提示，不静默删除用户明确写出的动作。
-  const conflicts=[],a=tags.map(x=>x.tag);
-  if(a.includes("standing")&&a.includes("sitting"))conflicts.push("standing / sitting");
-  if(a.includes("walking")&&a.includes("running"))conflicts.push("walking / running");
-  if(conflicts.length)$("#status").textContent="检测到动作冲突："+conflicts.join("、")+"；当前保留原始信息，后续按角色作用域消解。";
-
+  if(conflicts.length)$("#status").textContent="检测到角色级动作冲突："+conflicts.join("；")+"。未自动删除信息，请检查场景描述。";
   return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
 }
 $("#translate").onclick=()=>{$("#prompt").textContent=parse($("#input").value.trim())||"请输入自然语言描述。";$("#status").textContent="离线规则编译：已使用本地词库、角色资料与手选标签。"};$("#clear").onclick=()=>{$("#input").value="";$("#prompt").textContent="等待输入……";$("#status").textContent=""};$("#copy").onclick=async()=>{await navigator.clipboard.writeText($("#prompt").textContent);$("#status").textContent="已复制"};
