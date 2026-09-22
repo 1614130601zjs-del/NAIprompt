@@ -224,7 +224,8 @@ function parseMarkdownVocabulary(text){
     if(!raw)return inferCategory("",context)||"custom";
     const direct=categoryMap[raw.toLowerCase()]||categoryMap[raw];
     if(direct)return direct;
-    return inferCategory(raw,context);
+    const inferred=inferCategory(raw,context);
+    return inferred!=="custom"?inferred:raw;
   };
   const add=(tag,aliases=[],category="custom",context="")=>{
     tag=String(tag||"").trim()
@@ -233,7 +234,10 @@ function parseMarkdownVocabulary(text){
       .replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
     aliases=(Array.isArray(aliases)?aliases:[aliases]).flatMap(x=>String(x||"").split(/[、,，;；]/))
       .map(x=>x.trim().replace(/^\*+|\*+$/g,"")).filter(Boolean);
-    const finalCategory=normalizeCategory(category,context)||inferCategory(tag,context)||"custom";
+    const normalized=normalizeCategory(category,context);
+    const finalCategory=(normalized && normalized!=="custom")
+      ? normalized
+      : (inferCategory(tag,context)||"custom");
     if(!tag||seen.has(tag)||/^[-*_]{3,}$/.test(tag)||/^https?:\/\//i.test(tag)||tag.length>180)return;
     seen.add(tag);
     out.push({canonical_tag:tag,aliases,category:finalCategory||"custom",related:[],conflicts:[],source:"custom"});
