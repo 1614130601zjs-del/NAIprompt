@@ -24,7 +24,7 @@ label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{widt
 </head>
 <body>
 <main>
-<header class="head"><div class="eyebrow">NAI PROMPT COMPILER · V0.4</div><div class="title">自然语言 → NAI Prompt</div><div class="sub">离线优先：自然语言编译、角色管理、词库选择、提示词资料库；支持多角色属性作用域与意图自动识别。</div></header>
+<header class="head"><div class="eyebrow">NAI PROMPT COMPILER · V0.5</div><div class="title">自然语言 → NAI Prompt</div><div class="sub">离线优先：自然语言编译、角色管理、词库选择、提示词资料库；支持多角色属性作用域与意图自动识别。</div></header>
 <nav class="nav">
 <button class="active" data-page="translatePage">① 自然语言转化</button><button data-page="characterPage">② 角色管理</button><button data-page="vocabPage">③ 词库预览</button><button data-page="importPage">④ 词库管理</button><button data-page="libraryPage">⑤ 提示词资料库</button>
 </nav>
@@ -45,7 +45,7 @@ label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{widt
 <label>词库管理</label>
 <div class="small">可以导入自己的 JSON 词库。自定义词库保存在当前浏览器，不会覆盖项目内置词库；导入后可在「词库预览」中搜索、分类和选择。</div>
 <div class="import-box">
-<label for="vocabFile">导入 JSON 词库</label>
+<label for="vocabFile">导入词库</label>
 <input id="vocabFile" type="file" accept=".json,.txt,.md,text/plain,text/markdown,application/json">
 <div class="small" style="margin-top:7px">支持 JSON、TXT、MD；TXT/MD 可一行一个词，也支持「英文标签 | 中文别名」或「英文标签, 中文别名」。Markdown 标题、项目符号会自动去除。</div>
 <div class="row"><button class="primary" id="importVocab">导入词库</button><button id="exportVocab">导出我的词库</button><button class="danger" id="clearCustomVocab">清空我的词库</button></div>
@@ -175,7 +175,65 @@ window.deleteSave=id=>{library=library.filter(x=>x.id!==id);persistLibrary()}
 $("#saveEntry").onclick=()=>{const title=$("#saveTitle").value.trim()||"未命名提示词",entry={id:editingSave||("p_"+Date.now()),title,tags:$("#saveTags").value.trim(),natural:$("#saveNatural").value.trim(),nai:$("#saveNai").value.trim(),updatedAt:new Date().toLocaleString("zh-CN")};if(editingSave){const i=library.findIndex(x=>x.id===editingSave);if(i>=0)library[i]=entry}else library.unshift(entry);persistLibrary();$("#libraryStatus").textContent="已保存到本地资料库。";resetSaveForm()}
 $("#clearEntry").onclick=()=>{resetSaveForm();$("#libraryStatus").textContent=""};$("#librarySearch").oninput=renderLibrary;$("#libraryFilter").onchange=renderLibrary;
 $("#saveCurrent").onclick=()=>{const natural=$("#input").value.trim(),nai=$("#prompt").textContent==="等待输入……"?"":$("#prompt").textContent;$("#saveTitle").value=natural.slice(0,24)||"未命名提示词";$("#saveNatural").value=natural;$("#saveNai").value=nai;showPage("libraryPage");renderLibrary();$("#libraryStatus").textContent="已把当前编译内容带入资料库表单，请确认后保存。"}
-function normalizeImported(raw){\n  let arr=Array.isArray(raw)?raw:(Array.isArray(raw.entries)?raw.entries:(Array.isArray(raw.tags)?raw.tags:[]));\n  return arr.map(e=>{\n    if(typeof e==="string")return {canonical_tag:e.trim(),aliases:[],category:"custom",related:[],conflicts:[],source:"custom"};\n    const tag=String(e.canonical_tag||e.tag||e.name||e.prompt||"").trim();\n    if(!tag)return null;\n    const aliases=Array.isArray(e.aliases)?e.aliases:(Array.isArray(e.translations)?e.translations:(e.translation?[e.translation]:[]));\n    return {canonical_tag:tag,aliases:aliases.map(String).filter(Boolean),category:String(e.category||"custom"),related:Array.isArray(e.related)?e.related:[],conflicts:Array.isArray(e.conflicts)?e.conflicts:[],source:"custom"};\n  }).filter(Boolean);\n}\nfunction parseMarkdownVocabulary(text){\n  const out=[],seen=new Set();\n  const add=(tag,aliases=[],category="custom")=>{\n    tag=String(tag||"").trim().replace(/^\*+|\*+$/g,"").replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();\n    aliases=(Array.isArray(aliases)?aliases:[aliases]).map(x=>String(x||"").trim()).filter(Boolean);\n    if(!tag||seen.has(tag)||/^[-*_]{3,}$/.test(tag)||/^https?:\/\//i.test(tag)||tag.length>180)return;\n    seen.add(tag);out.push({canonical_tag:tag,aliases,category,related:[],conflicts:[],source:"custom"});\n  };\n  const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/);\n  let inFence=false,header=null;\n  for(let raw of lines){\n    let line=raw.trim(); if(!line)continue;\n    if(new RegExp("^\\s*"+bt+"{3}").test(line)){inFence=!inFence;continue;}\n    if(/^<!--/.test(line)||/^-->|^<\/?[a-z]/i.test(line))continue;\n    if(line.includes("|")){\n      const cells=line.replace(/^\|/,"").replace(/\|$/,"").split("|").map(x=>x.trim());\n      if(cells.length>=2 && cells.some(x=>/^:?-{2,}:?$/.test(x)))continue;\n      if(!header && cells.length>=2 && /tag|标签|english|英文/i.test(cells[0])){header=cells;continue;}\n      if(cells.length>=2){\n        let ti=0,ai=1,ci=2;\n        if(header){ti=Math.max(0,header.findIndex(x=>/tag|标签|english|英文|canonical/i.test(x)));ai=header.findIndex(x=>/中文|别名|alias|translation/i.test(x));ci=header.findIndex(x=>/分类|category/i.test(x));}\n        add(cells[ti>=0?ti:0],ai>=0?cells[ai].split(/[、,，;；]/):[],ci>=0?cells[ci]:"custom");continue;\n      }\n    }\n    line=line.replace(/^#{1,6}\s+/,"").replace(/^[-*+]\s+/,"").replace(/^>\s*/,"").replace(/^\d+[.)]\s+/,"").trim();\n    if(!line)continue;\n    line=line.replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/^\*\*|\*\*$/g,"").trim();\n    const m=line.match(/^(.+?)\s*(?:\|\s*|\s+[—–-]\s+|\s*[:：=]\s+)(.+)$/);\n    if(m){const left=m[1].replace(/^\*+|\*+$/g,"").trim(),right=m[2].replace(/^\*+|\*+$/g,"").trim();if(left&&right&&!/^https?:/i.test(left))add(left,right.split(/[、,，;；]/));}\n    else {const plain=line.replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();if(plain.length<=80&&!/[。！？.!?]$/.test(plain)&&!/^import|^schema|^category/i.test(plain))add(plain);}\n  }\n  return out;\n}\n$("#importVocab").onclick=()=>{
+function normalizeImported(raw){
+  let arr=Array.isArray(raw)?raw:(Array.isArray(raw.entries)?raw.entries:(Array.isArray(raw.tags)?raw.tags:[]));
+  return arr.map(e=>{
+    if(typeof e==="string")return {canonical_tag:e.trim(),aliases:[],category:"custom",related:[],conflicts:[],source:"custom"};
+    const tag=String(e.canonical_tag||e.tag||e.name||e.prompt||"").trim();
+    if(!tag)return null;
+    const aliases=Array.isArray(e.aliases)?e.aliases:(Array.isArray(e.translations)?e.translations:(e.translation?[e.translation]:[]));
+    return {canonical_tag:tag,aliases:aliases.map(String).filter(Boolean),category:String(e.category||"custom"),related:Array.isArray(e.related)?e.related:[],conflicts:Array.isArray(e.conflicts)?e.conflicts:[],source:"custom"};
+  }).filter(Boolean);
+}
+const bt="`";
+function parseMarkdownVocabulary(text){
+  const out=[],seen=new Set();
+  const add=(tag,aliases=[],category="custom")=>{
+    tag=String(tag||"").trim().replace(/^\\*+|\\*+$/g,"").replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
+    aliases=(Array.isArray(aliases)?aliases:[aliases]).map(x=>String(x||"").trim()).filter(Boolean);
+    if(!tag||seen.has(tag)||/^[-*_]{3,}$/.test(tag)||/^https?:\\/\\//i.test(tag)||tag.length>180)return;
+    seen.add(tag);out.push({canonical_tag:tag,aliases,category,related:[],conflicts:[],source:"custom"});
+  };
+  const lines=String(text||"").replace(/^\\uFEFF/,"").split(/\\r?\\n/);
+  let header=null;
+  for(let raw of lines){
+    let line=raw.trim(); if(!line)continue;
+    if(new RegExp("^\\\\s*"+bt+"{3}").test(line))continue;
+    if(/^<!--/.test(line)||/^-->|^<\\/?[a-z]/i.test(line))continue;
+    if(line.includes("|")){
+      const cells=line.replace(/^\\|/,"").replace(/\\|$/,"").split("|").map(x=>x.trim());
+      if(cells.length>=2 && cells.some(x=>/^:?-{2,}:?$/.test(x)))continue;
+      if(!header && cells.length>=2 && /tag|标签|english|英文/i.test(cells[0])){header=cells;continue;}
+      if(cells.length>=2){
+        let ti=0,ai=1,ci=2;
+        if(header){
+          ti=Math.max(0,header.findIndex(x=>/tag|标签|english|英文|canonical/i.test(x)));
+          ai=header.findIndex(x=>/中文|别名|alias|translation/i.test(x));
+          ci=header.findIndex(x=>/分类|category/i.test(x));
+        }
+        add(cells[ti>=0?ti:0],ai>=0?cells[ai].split(/[、,，;；]/):[],ci>=0?cells[ci]:"custom");continue;
+      }
+    }
+    line=line.replace(/^#{1,6}\\s+/,"").replace(/^[-*+]\\s+/,"").replace(/^>\\s*/,"").replace(/^\\d+[.)]\\s+/,"").trim();
+    if(!line)continue;
+    line=line.replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g,"$1").replace(/^\\*\\*|\\*\\*$/g,"").trim();
+    const m=line.match(/^(.+?)\\s*(?:\\|\\s*|\\s+[—–-]\\s+|\\s*[:：=]\\s+)(.+)$/);
+    if(m){
+      const left=m[1].replace(/^\\*+|\\*+$/g,"").trim(),right=m[2].replace(/^\\*+|\\*+$/g,"").trim();
+      if(left&&right&&!/^https?:/i.test(left))add(left,right.split(/[、,，;；]/));
+    }else{
+      const plain=line.replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
+      if(plain.length<=80&&!/[。！？.!?]$/.test(plain)&&!/^import|^schema|^category/i.test(plain))add(plain);
+    }
+  }
+  return out;
+}
+function renderCustomVocab(){
+  const box=$("#customVocabList");
+  if(!customVocabulary.length){box.innerHTML='<div class="small">暂无自定义词条。</div>';return}
+  box.innerHTML=customVocabulary.map(e=>'<div class="import-item"><div><b>'+esc(e.canonical_tag)+'</b><div class="small">'+esc((e.aliases||[]).join(" · ")||"无中文别名")+' · '+esc(e.category||"custom")+'</div></div></div>').join("");
+}
+$("#importVocab").onclick=()=>{
   const file=$("#vocabFile").files[0];
   if(!file){$("#importStatus").textContent="请先选择 JSON、TXT 或 MD 文件。";return}
   const reader=new FileReader();
