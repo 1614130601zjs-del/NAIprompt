@@ -203,32 +203,59 @@ function normalizeImported(raw){
 const bt="`";
 function parseMarkdownVocabulary(text){
   const out=[],seen=new Set();
-  const add=(tag,aliases=[],category="custom")=>{
+  const categoryMap={
+    appearance:"appearance",外貌:"appearance",人物外貌:"appearance",发型:"appearance",头发:"appearance",眼睛:"appearance",
+    clothing:"clothing",服装:"clothing",衣着:"clothing",穿着:"clothing",
+    action:"action",动作:"action",行为:"action",
+    pose:"pose",姿势:"pose",
+    environment:"environment",环境:"environment",场景:"environment",背景:"environment",
+    composition:"composition",构图:"composition",
+    camera:"camera",镜头:"camera",摄影:"camera",
+    lighting:"lighting",光线:"lighting",灯光:"lighting",
+    character:"appearance",角色:"appearance"
+  };
+  const inferCategory=(name,context="")=>{
+    const s=(String(name||"")+" "+String(context||"")).toLowerCase();
+    for(const k of Object.keys(categoryMap)) if(s.includes(k.toLowerCase())) return categoryMap[k];
+    return "custom";
+  };
+  const add=(tag,aliases=[],category="custom",context="")=>{
     tag=String(tag||"").trim()
-      .replace(/^[-*+>]+\s*/,"")
-      .replace(/^#{1,6}\s+/,"")
+      .replace(/^[-*+>]+\s*/,"").replace(/^#{1,6}\s+/,"")
       .replace(/^\*+|\*+$/g,"")
-      .replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"")
-      .trim();
-    aliases=(Array.isArray(aliases)?aliases:[aliases])
-      .flatMap(x=>String(x||"").split(/[、,，;；]/))
-      .map(x=>x.trim().replace(/^\*+|\*+$/g,""))
-      .filter(Boolean);
+      .replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
+    aliases=(Array.isArray(aliases)?aliases:[aliases]).flatMap(x=>String(x||"").split(/[、,，;；]/))
+      .map(x=>x.trim().replace(/^\*+|\*+$/g,"")).filter(Boolean);
+    const finalCategory=categoryMap[String(category||"").trim().toLowerCase()]||categoryMap[String(category||"").trim()]||category||inferCategory(tag,context);
     if(!tag||seen.has(tag)||/^[-*_]{3,}$/.test(tag)||/^https?:\/\//i.test(tag)||tag.length>180)return;
     seen.add(tag);
-    out.push({canonical_tag:tag,aliases,category:String(category||"custom").trim()||"custom",related:[],conflicts:[],source:"custom"});
+    out.push({canonical_tag:tag,aliases,category:finalCategory||"custom",related:[],conflicts:[],source:"custom"});
   };
   const clean=s=>String(s||"").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/<[^>]+>/g,"").trim();
   const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/);
-  let tableHeader=null;
-  let inFence=false;
+  let currentCategory="custom",tableHeader=null,inFence=false;
   for(let raw of lines){
-    let line=clean(raw);
-    if(!line)continue;
+    let line=clean(raw); if(!line)continue;
     if(/^\s*\`\`\`/.test(line)){inFence=!inFence;continue;}
     if(/^<!--/.test(line)||/^-->|^<\/?[a-z]/i.test(line))continue;
 
-    // Markdown 表格：自动识别「英文标签 | 中文别名 | 分类」。
+    // Markdown 标题/分组名会作为后续词条的分类依据。
+    const heading=line.match(/^#{1,6}\s+(.+)$/);
+    if(heading){
+      const h=clean(heading[1]).replace(/^[-*+>]+\s*/,"").trim();
+      currentCategory=categoryMap[h.toLowerCase()]||categoryMap[h]||inferCategory(h);
+      continue;
+    }
+
+    // 「分类：xxx」「Category: xxx」也会切换当前分组。
+    const group=line.match(/^(?:分类|类别|category|group|分组)\s*[:：=]\s*(.+)$/i);
+    if(group){
+      currentCategory=categoryMap[group[1]?.trim()?.toLowerCase()]||categoryMap[group[1]?.trim()]||inferCategory(group[1]);
+      const g=group[1].trim();
+      currentCategory=categoryMap[g.toLowerCase()]||categoryMap[g]||inferCategory(g);
+      continue;
+    }
+
     if(line.includes("|")){
       const cells=line.replace(/^\|/,"").replace(/\|$/,"").split("|").map(x=>clean(x));
       if(cells.length>=2 && cells.every(x=>/^:?-{2,}:?$/.test(x)))continue;
@@ -238,31 +265,28 @@ function parseMarkdownVocabulary(text){
       if(cells.length>=2){
         let ti=0,ai=1,ci=-1;
         if(tableHeader){
-          const find=(re)=>tableHeader.findIndex(x=>re.test(x));
+          const find=re=>tableHeader.findIndex(x=>re.test(x));
           const t=find(/tag|标签|english|英文|canonical/i),a=find(/中文|别名|alias|translation/i),cat=find(/分类|category/i);
           if(t>=0)ti=t;if(a>=0)ai=a;if(cat>=0)ci=cat;
         }
-        add(cells[ti]||"",ai>=0?(cells[ai]||"").split(/[、,，;；]/):[],ci>=0?(cells[ci]||"custom"):"custom");
+        add(cells[ti]||"",ai>=0?(cells[ai]||"").split(/[、,，;；]/):[],ci>=0?(cells[ci]||currentCategory):currentCategory,currentCategory);
         continue;
       }
     }
 
-    // 去掉 Markdown 列表/标题/引用标记。
-    line=line.replace(/^#{1,6}\s+/,"").replace(/^[-*+]\s+/,"").replace(/^>\s*/,"").replace(/^\d+[.)]\s+/,"").trim();
+    line=line.replace(/^[-*+]\s+/,"").replace(/^>\s*/,"").replace(/^\d+[.)]\s+/,"").trim();
     if(!line)continue;
 
-    // 常见「标签：中文」「标签 = 中文」「标签 - 中文」「标签 | 中文」写法。
     const pair=line.match(/^(.+?)\s*(?:\|\s*|\s+[—–-]\s+|\s*[:：=]\s*)(.+)$/);
     if(pair){
       const left=pair[1].trim(),right=pair[2].trim();
-      if(left&&right&&!/^https?:/i.test(left))add(left,right);
+      if(left&&right&&!/^https?:/i.test(left))add(left,right,currentCategory,currentCategory);
       continue;
     }
 
-    // 只有一个字段时：英文/NAI tag 直接作为 canonical_tag。
     const plain=line.replace(new RegExp("^"+bt+"+|"+bt+"+$","g"),"").trim();
     if(plain.length<=120&&!/[。！？.!?]$/.test(plain)&&!/^import|^schema|^category|^说明|^词库/i.test(plain)){
-      add(plain);
+      add(plain,[],currentCategory,currentCategory);
     }
   }
   return out;
