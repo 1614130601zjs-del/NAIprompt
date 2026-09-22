@@ -562,508 +562,362 @@ function matchVocabulary(text){
 
 // ── 核心编译器 ────────────────────────────────────────────
 function parse(text){
-  const tags=[], add=(x,w=1)=>{ if(x&&!tags.some(t=>t.tag===x)) tags.push({tag:x,weight:w}); };
-  const removeTag = tag => { const i=tags.findIndex(t=>t.tag===tag); if(i>=0) tags.splice(i,1); };
-  const present = { has: tag => tags.some(t=>t.tag===tag) };
-  const emphasisBoost = intent!=="none" ? 0.05 : 0;
-  const conflicts=[];
   if(!text) return "";
 
-  // 中文自然句归一化：把“黑色的头发 / 穿着黑色西装 / 蓝色的眼睛”等
-  // 常见表达统一成词库更容易识别的形式。这里不翻译句子，只消除中文语法表面的差异。
-  const normalizeNaturalChinese = input => {
-    let s=String(input||"")
-      .replace(/[\u3000]/g," ")
-      .replace(/[“”‘’]/g,"")
-      .replace(/\s+/g," ")
-      .trim();
-    const rules=[
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?头发/g,"$1发"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?眼睛/g,"$1眼"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?眼眸/g,"$1眼"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?头发/g,"$1发"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(裙子|裙装)/g,"$1裙"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(西装|套装)/g,"$1西装"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(大衣|外套)/g,"$1大衣"],
-      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(眼镜)/g,"$1眼镜"],
-      [/长长的?头发/g,"长发"],
-      [/短短的?头发/g,"短发"],
-      [/戴着|戴了|佩戴着/g,"戴"],
-      [/穿着|身穿|穿上|穿了|穿着一身/g,"穿"],
-      [/拿着|手里拿着|手持|握着|捧着/g,"拿"],
-      [/撑着|撑着一把|打着|打着一把/g,"撑伞"],
-      [/正在站着|正站着|站立着/g,"站着"],
-      [/正在坐着|正坐着/g,"坐着"],
-      [/正在走着|正走着|正在行走/g,"走着"],
-      [/正在跑着|正跑着|正在奔跑/g,"跑着"],
-      [/正在看着|正看着/g,"看着"],
-      [/正在下雨/g,"下雨"],
-      [/在下雨的天气里/g,"雨天"],
-      [/在下着雨的夜晚/g,"雨夜"],
-      [/一个年轻的女生|一位年轻女生|年轻的女生/g,"女生"],
-      [/一个年轻的男生|一位年轻男生|年轻的男生/g,"男生"]
-    ];
-    rules.forEach(([re,to])=>{ s=s.replace(re,to); });
-    return s;
-  };
-  text = normalizeNaturalChinese(text);
+  /*
+   * NAI Semantic Compiler v1
+   * 核心原则：中文“语义片段”→结构化事件→词库 canonical tag→NAI 语义单元。
+   * 不再把中文逐词翻译成孤立 token。
+   */
+  const source=String(text)
+    .replace(/[\u3000]/g," ")
+    .replace(/[“”‘’]/g,"")
+    .replace(/\s+/g," ")
+    .trim();
 
-  // 语义映射层（中文自然语言 → NAI标签）
-  const semanticMap=[
-    // 动作
-    [/站着|站立|站在|站起/,"standing"],
-    [/坐着|坐在|坐下/,"sitting"],
-    [/走着|走路|行走|漫步/,"walking"],
-    [/跑着|跑步|奔跑/,"running"],
-    [/跪着|跪下|跪在/,"kneeling"],
-    [/躺着|躺在|躺下/,"lying down"],
-    [/趴着|趴在/,"lying on stomach"],
-    [/牵手|牵着手|手牵手/,"holding hands"],
-    [/拥抱|抱住|抱着/,"hugging"],
-    [/看着对方|互相看|对视/,"looking at each other"],
-    [/背对背/,"back to back"],
-    [/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/,"pointing"],
-    [/伸手|伸出手/,"reaching out"],
-    [/撑伞|拿伞|打伞|拿着伞|撑着伞|手里拿着伞/,"holding umbrella"],
-    [/靠着|倚着|倚靠/,"leaning against"],
-    [/亲吻|接吻|吻着/,"kiss"],
-    // 外貌
-    [/黑发|黑色头发/,"black hair"],
-    [/白发|白色头发/,"white hair"],
-    [/金发|金色头发/,"blonde hair"],
-    [/银发|银色头发/,"silver hair"],
-    [/红发|红色头发/,"red hair"],
-    [/蓝发|蓝色头发/,"blue hair"],
-    [/棕发|棕色头发/,"brown hair"],
-    [/粉发|粉色头发/,"pink hair"],
-    [/紫发|紫色头发/,"purple hair"],
-    [/长发|长头发/,"long hair"],
-    [/短发|短头发/,"short hair"],
-    [/双马尾/,"twintails"],
-    [/马尾/,"ponytail"],
-    [/麻花辫|辫子/,"braid"],
-    [/红眼|红色眼睛|红瞳/,"red eyes"],
-    [/蓝眼|蓝色眼睛|蓝瞳/,"blue eyes"],
-    [/绿眼|绿色眼睛|绿瞳/,"green eyes"],
-    [/金眼|金色眼睛/,"yellow eyes"],
-    [/紫眼|紫色眼睛/,"purple eyes"],
-    [/眼镜/,"glasses"],
-    // 服装
-    [/校服/,"school uniform"],
-    [/黑西装/,"black suit"],
-    [/黑大衣|黑色大衣/,"black coat"],
-    [/白裙|白色连衣裙/,"white dress"],
-    [/和服/,"kimono"],
-    [/旗袍/,"qipao"],
-    [/水手服/,"sailor uniform"],
-    [/女仆装/,"maid outfit"],
-    [/兔女郎/,"bunnysuit"],
-    [/比基尼/,"bikini"],
-    [/泳装/,"swimsuit"],
-    // 环境
-    [/雨中|下雨|雨天|雨夜/,"rain"],
-    [/雪中|下雪|雪天/,"snow"],
-    [/雾气|雾中|大雾/,"fog"],
-    [/霓虹|霓虹灯/,"neon lights"],
-    [/街灯|路灯/,"street lights"],
-    [/黄昏|夕阳|日落/,"sunset"],
-    [/清晨|日出/,"sunrise"],
-    [/夜晚|夜间|夜里/,"night"],
-    [/白天|白日/,"day"],
-    [/室内/,"indoors"],
-    [/室外|户外/,"outdoors"],
-    [/学校|教室/,"school"],
-    [/咖啡厅|咖啡馆/,"cafe"],
-    [/海边|海滩/,"beach"],
-    [/森林|树林/,"forest"],
-    [/城市|街道/,"city"],
-    // 光线
-    [/逆光/,"backlighting"],
-    [/柔光|柔和的光/,"soft lighting"],
-    [/戏剧性光线|强烈光影/,"dramatic lighting"],
-    [/赛博朋克|赛博/,"cyberpunk"],
-    // 构图
-    [/电影感|电影般|影视感|镜头感/,"cinematic composition"],
-    [/景深/,"depth of field"],
-    [/特写|近景/,"close-up"],
-    [/远景|广角/,"wide shot"],
-    [/低机位|低角度/,"low angle"],
-    [/高机位|高角度/,"high angle"],
-    [/负空间|留白/,"negative space"],
-    [/偏构图|偏置/,"off-center composition"],
-    [/动态构图|动感/,"dynamic composition"],
-    [/荷兰角|倾斜镜头/,"dutch angle"],
-    // 情绪/意图
-    [/孤独|寂寥|空旷|疏离/,"negative space"],
-    [/紧张|压迫感|冲突感/,"dramatic lighting"],
-  ];
+  const vocab=allVocabulary();
+  const byTag=new Map(vocab.map(e=>[e.canonical_tag,e]));
+  const norm=s=>String(s||"").replace(/_/g," ").trim();
+  const entry=t=>byTag.get(norm(t))||null;
+  const aliasesOf=e=>[e?.canonical_tag,...(e?.aliases||[])].filter(Boolean).map(norm);
 
+  // 中文表面语法归一化：只处理句式，不改变语义。
+  let textN=source;
+  [
+    [/穿着|身穿|穿上|穿了/g,"穿"],
+    [/戴着|戴了|佩戴着/g,"戴"],
+    [/拿着|手里拿着|手持|握着|捧着/g,"拿"],
+    [/撑着一把|撑着|打着一把|打着/g,"撑伞"],
+    [/正在|正/g,""],
+    [/长长的头发/g,"长发"],
+    [/短短的头发/g,"短发"]
+  ].forEach(([re,to])=>textN=textN.replace(re,to));
 
-
-  semanticMap.forEach(([re,tag])=>{ if(re.test(text)) add(tag, 1.08); });
-
-  // ── 中文人物语义推断 ─────────────────────────────────────
-  // 先解析人物数量/性别，再让后面的动作与关系编排器处理事件。
-  // 重点处理“他牵着他的手”这类没有显式人物名、但同一关系中出现两个角色的句子。
-  const inferPeople = () => {
-    const s=text;
-    const malePronouns=(s.match(/他/g)||[]).length;
-    const femalePronouns=(s.match(/她/g)||[]).length;
-    const maleNouns=(s.match(/男生|男孩|男人|男性|男士/g)||[]).length;
-    const femaleNouns=(s.match(/女生|女孩|女人|女性|女士/g)||[]).length;
-    const relational=/牵着手|牵住手|牵手|手牵手|拥抱|抱着|抱住|亲吻|接吻|对视|看着对方/;
-
-    if(relational.test(s)){
-      if(malePronouns>=2 && femalePronouns===0) return "2boys";
-      if(femalePronouns>=2 && malePronouns===0) return "2girls";
-      if(malePronouns>=1 && femalePronouns>=1) return "1boy, 1girl";
-      if(maleNouns>=2 && femaleNouns===0) return "2boys";
-      if(femaleNouns>=2 && maleNouns===0) return "2girls";
-    }
-
-    if(/(?:两个|两名|两位|两人)(?:男生|男孩|男人|男性|男士)/.test(s)) return "2boys";
-    if(/(?:两个|两名|两位|两人)(?:女生|女孩|女人|女性|女士)/.test(s)) return "2girls";
-    if(/一男一女|一个男生.{0,8}(一个女生|女孩|女人|女性)|一个女生.{0,8}(一个男生|男孩|男人|男性)/.test(s)) return "1boy, 1girl";
-    return null;
-  };
-  const inferredPeople = inferPeople();
-
-  // 从词库匹配
-  const hits = matchVocabulary(text);
-  const matchedChars = chars.filter(c=>c.name && text.includes(c.name));
-  const genericPerson = /男生|男孩|男人|男性|女生|女孩|女人|女性|角色|人物/.test(text);
-
-  const appearanceFor = c=>[c.hair,c.eye,c.cloth,c.feature].filter(Boolean);
-  const scopeFor = (c,index)=>{
-    const positions = matchedChars.map(x=>text.indexOf(x.name));
-    const pos=positions[index], next=positions.filter(p=>p>pos);
-    const end = next.length ? Math.min(...next) : text.length;
-    return text.slice(Math.max(0,pos-60), Math.min(text.length,end+120));
-  };
-  const classifyScope = scope=>{
-    const out={actions:[],poses:[],clothing:[],appearance:[]};
-    matchVocabulary(scope).forEach(e=>{
-      if(e.category==="action") out.actions.push(e.canonical_tag);
-      else if(e.category==="pose") out.poses.push(e.canonical_tag);
-      else if(["clothing","accessories","footwear"].includes(e.category)) out.clothing.push(e.canonical_tag);
-      else if(["appearance","hair","eyes","face"].includes(e.category)) out.appearance.push(e.canonical_tag);
-    });
-    semanticMap.forEach(([re,tag])=>{ if(re.test(scope)){
-      const actionTags=["standing","sitting","walking","running","holding hands","hugging","looking at each other","back to back","reaching out","kneeling","lying down","lying on stomach","kiss"];
-      const appearTags=["black hair","white hair","blonde hair","silver hair","red hair","blue hair","brown hair","pink hair","purple hair","long hair","short hair","twintails","ponytail","braid","red eyes","blue eyes","green eyes","yellow eyes","purple eyes","glasses"];
-      const clothTags=["school uniform","black suit","black coat","white dress","kimono","qipao","sailor uniform","maid outfit","bunnysuit","bikini","swimsuit"];
-      if(actionTags.includes(tag)) out.actions.push(tag);
-      else if(appearTags.includes(tag)) out.appearance.push(tag);
-      else if(clothTags.includes(tag)) out.clothing.push(tag);
-    }});
-    return out;
-  };
-
-  if(matchedChars.length){
-    add(matchedChars.length===2?"2people":matchedChars.length===1?(matchedChars[0].gender==="男"?"1boy":matchedChars[0].gender==="女"?"1girl":"1person"):matchedChars.length+"people",1.05);
-    matchedChars.forEach((c,i)=>{
-      const scope=scopeFor(c,i);
-      const base=appearanceFor(c);
-      const scoped=classifyScope(scope);
-      const temporary=scoped.clothing.length||scoped.appearance.length;
-      if(c.locked||!temporary) base.forEach((x,j)=>add(x,j<2?1.22:1.12));
-      else{
-        const overridden=new Set(scoped.clothing.concat(scoped.appearance));
-        base.forEach(x=>{ if(!overridden.has(x)) add(x,1.1); });
+  const hits=[];
+  const seen=new Set();
+  vocab.forEach(e=>{
+    aliasesOf(e).sort((x,y)=>y.length-x.length).forEach(alias=>{
+      if(alias.length<2) return;
+      let from=0;
+      while(from<textN.length){
+        const p=textN.toLowerCase().indexOf(alias.toLowerCase(),from);
+        if(p<0) break;
+        const key=e.canonical_tag+"@"+p;
+        if(!seen.has(key)){
+          seen.add(key);
+          hits.push({tag:e.canonical_tag,entry:e,pos:p,end:p+alias.length,alias});
+        }
+        from=p+Math.max(1,alias.length);
       }
-      scoped.clothing.concat(scoped.appearance).forEach(x=>add(x,1.2));
-      scoped.actions.concat(scoped.poses).forEach(x=>add(x,1.14));
-      const gender=/男生|男孩|男人|男性/.test(scope)?"1boy":/女生|女孩|女人|女性/.test(scope)?"1girl":null;
-      if(gender) add(gender,1.04);
-      if(scoped.actions.includes("standing")&&scoped.actions.includes("sitting")) conflicts.push(c.name+": standing/sitting");
-      if(scoped.actions.includes("walking")&&scoped.actions.includes("running")) conflicts.push(c.name+": walking/running");
     });
-  } else {
-    hits.forEach(e=>add(e.canonical_tag, e.category==="appearance"||e.category==="hair"||e.category==="eyes"||e.category==="face"?1.18:e.category==="action"?1.12:1));
-    if(inferredPeople){
-      inferredPeople.split(/,\s*/).forEach(tag=>add(tag));
-    }else if(/两个|2个|两名|两人|一男一女/.test(text)) add("2people");
-    else if(/女生|女孩|女人|女性/.test(text)) add("1girl");
-    else if(/男生|男孩|男人|男性/.test(text)) add("1boy");
-    if(/独自|一个人|单独|solo/.test(text)) add("solo");
+  });
+  hits.sort((x,y)=>(x.pos-y.pos)||(y.alias.length-x.alias.length));
+
+  const has=(tag)=>hits.some(h=>h.tag===tag);
+  const hitTags=(category)=>{
+    const s=new Set();
+    hits.forEach(h=>{if(!category||h.entry?.category===category)s.add(h.tag)});
+    return [...s];
+  };
+  const addUnique=(arr,tag,weight=1)=>{
+    if(!tag) return;
+    if(!arr.some(x=>x.tag===tag)) arr.push({tag,weight});
+  };
+
+  // ── 1. 人物实体解析 ───────────────────────────────────
+  const personSpans=[];
+  const personRe=/(?:一个|一名|一位|两个|两名|两位|三个人|三名|两人|三人)?\s*(?:年轻的)?\s*(?:男生|男孩|男人|男性|男士|女生|女孩|女人|女性|女士|人物|角色)/g;
+  let m;
+  while((m=personRe.exec(textN))){
+    const raw=m[0];
+    const male=/男生|男孩|男人|男性|男士/.test(raw);
+    const female=/女生|女孩|女人|女性|女士/.test(raw);
+    const count=/两个|两名|两位|两人/.test(raw)?2:/三个人|三名|三人/.test(raw)?3:1;
+    personSpans.push({pos:m.index,end:m.index+raw.length,gender:male?"male":female?"female":"unknown",count,raw});
   }
 
+  const pronouns=[];
+  const proRe=/他|她|他们|她们|其|对方/g;
+  while((m=proRe.exec(textN))) pronouns.push({text:m[0],pos:m.index,end:m.index+m[0].length});
 
-  // ── 语义词组编排器 v2 ─────────────────────────────────
-  // 不再依赖“一个中文词 = 一个英文标签”。先识别语义角色，再把同一
-  // 局部事件里的主体、动作、修饰和宾语合成为一个 NAI 可读的短语单元。
-  const semanticGroups = [
-    {re:/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/, phrase:"pointing with finger", consume:["pointing","finger"]},
-    {re:/牵着手|牵住手|牵手|手牵手/, phrase:"holding hands", consume:["holding hands"]},
-    {re:/坐在.{0,12}(窗边|靠窗)/, phrase:"sitting by window", consume:["sitting","by window"]},
-    {re:/(面对面|面对彼此|互相面对).{0,8}(坐着|坐在)/, phrase:"facing each other while sitting", consume:["facing each other","sitting"]}
-  ];
+  // 关系/互动语句中，重复代词通常表示不同参与者，而不是“一个人出现两次”。
+  const relationCue=/牵|牵着|牵住|牵手|手牵手|拥抱|抱着|抱住|亲吻|接吻|对视|面对彼此|面对面|看着对方/;
+  let inferredPeople=null;
+  if(relationCue.test(textN)){
+    const maleP=(textN.match(/他/g)||[]).length;
+    const femaleP=(textN.match(/她/g)||[]).length;
+    const maleN=(textN.match(/男生|男孩|男人|男性|男士/g)||[]).length;
+    const femaleN=(textN.match(/女生|女孩|女人|女性|女士/g)||[]).length;
+    if(maleP>=2 && femaleP===0) inferredPeople="2boys";
+    else if(femaleP>=2 && maleP===0) inferredPeople="2girls";
+    else if(maleP>=1 && femaleP>=1) inferredPeople="1boy, 1girl";
+    else if(maleN>=2 && femaleN===0) inferredPeople="2boys";
+    else if(femaleN>=2 && maleN===0) inferredPeople="2girls";
+  }
 
-  const phraseExists = p => tags.some(x=>x.tag===p);
-  const consumeTags = list => list.forEach(t=>{ if(tags.some(x=>x.tag===t)) removeTag(t); });
-  const applySemanticGroups = () => {
-    semanticGroups.forEach(rule=>{
-      if(!rule.re.test(text) || phraseExists(rule.phrase)) return;
-      const usable=rule.consume.filter(t=>tags.some(x=>x.tag===t));
-      // 关系短语即使只有一个基础动作标签，也可以成立；不要因为另一个
-      // 身体部位词未进入词库而退化成散标签。
-      if(!usable.length) return;
-      consumeTags(usable);
-      add(rule.phrase,Math.min(1.30,1.16+emphasisBoost));
-    });
+  const personTags=[];
+  const explicitCounts=personSpans.reduce((s,p)=>s+p.count,0);
+  if(inferredPeople){
+    inferredPeople.split(/,\s*/).forEach(t=>addUnique(personTags,t));
+  }else if(/一男一女/.test(textN)){
+    addUnique(personTags,"1boy"); addUnique(personTags,"1girl");
+  }else if(explicitCounts){
+    const boys=personSpans.filter(p=>p.gender==="male").reduce((s,p)=>s+p.count,0);
+    const girls=personSpans.filter(p=>p.gender==="female").reduce((s,p)=>s+p.count,0);
+    if(boys) addUnique(personTags,boys+"boy"+(boys>1?"s":""));
+    if(girls) addUnique(personTags,girls+"girl"+(girls>1?"s":""));
+    if(!boys&&!girls) addUnique(personTags,explicitCounts+"people");
+  }else if(/独自|一个人|单独|solo/.test(textN)){
+    addUnique(personTags,"solo");
+  }else if(/男生|男孩|男人|男性|男士/.test(textN)){
+    addUnique(personTags,"1boy");
+  }else if(/女生|女孩|女人|女性|女士/.test(textN)){
+    addUnique(personTags,"1girl");
+  }
 
-    // 通用“动作 + 宾语/地点”编排：从当前标签及其中文别名的位置
-    // 推断局部关系，而不是为每一种名词写一条正则。
-    const nodes=tags.map((x,i)=>{
-      const e=entryFor(x.tag);
-      const aliases=[x.tag,...(e?.aliases||[])].filter(Boolean);
-      const positions=aliases.map(a=>text.indexOf(a)).filter(p=>p>=0);
-      return {tag:x.tag,category:e?.category||"unknown",pos:positions.length?Math.min(...positions):-1,index:i};
-    }).filter(x=>x.pos>=0);
-
-    const actionNodes=nodes.filter(x=>["action","pose"].includes(x.category));
-    const objectNodes=nodes.filter(x=>["object","environment","nature","animal","food","composition"].includes(x.category));
-
-    actionNodes.forEach(action=>{
-      const nearby=objectNodes
-        .filter(obj=>Math.abs(obj.pos-action.pos)<=18)
-        .sort((a,b)=>Math.abs(a.pos-action.pos)-Math.abs(b.pos-action.pos))[0];
-      if(!nearby) return;
-
-      const cue=text.slice(Math.min(action.pos,nearby.pos),Math.max(action.pos,nearby.pos)+24);
-      let phrase="";
-      if(/(坐在|坐着|坐于)/.test(cue)) phrase=action.tag+" on "+nearby.tag;
-      else if(/(站在|站着|站于)/.test(cue)) phrase=action.tag+" at "+nearby.tag;
-      else if(/(靠着|倚着|倚靠)/.test(cue)) phrase=action.tag+" against "+nearby.tag;
-      else if(/(指着|指向|指给)/.test(cue)) phrase=action.tag+" at "+nearby.tag;
-      else if(/(看着|望着|注视着|凝视着|盯着)/.test(cue)) phrase=action.tag+" at "+nearby.tag;
-      else return;
-
-      if(!phraseExists(phrase)){
-        removeTag(action.tag);
-        removeTag(nearby.tag);
-        add(phrase,Math.min(1.30,1.12+emphasisBoost));
-      }
-    });
-
-    // 通用“动作 + 环境”事件：同一局部中文范围内才组合。
-    const envNodes=tags.map((x,i)=>{
-      const e=entryFor(x.tag);
-      const aliases=[x.tag,...(e?.aliases||[])].filter(Boolean);
-      const positions=aliases.map(a=>text.indexOf(a)).filter(p=>p>=0);
-      return {tag:x.tag,category:e?.category||"unknown",pos:positions.length?Math.min(...positions):-1,index:i};
-    }).filter(x=>x.pos>=0 && x.category==="environment");
-
-    tags.slice().forEach(x=>{
-      const e=entryFor(x.tag);
-      if(!e || !["action","pose"].includes(e.category)) return;
-      const ap=nodes.find(n=>n.tag===x.tag)?.pos;
-      if(ap==null || ap<0) return;
-      const env=envNodes.filter(n=>Math.abs(n.pos-ap)<=24).sort((a,b)=>Math.abs(a.pos-ap)-Math.abs(b.pos-ap))[0];
-      if(!env) return;
-      const cue=text.slice(Math.min(ap,env.pos),Math.max(ap,env.pos)+18);
-      let phrase="";
-      if(/(走在|走着|正在走|行走)/.test(cue)) phrase=x.tag+" in "+env.tag;
-      else if(/(站在|站着|站于)/.test(cue)) phrase=x.tag+" in "+env.tag;
-      else if(/(坐在|坐着|坐于)/.test(cue)) phrase=x.tag+" in "+env.tag;
-      if(phrase && !phraseExists(phrase)){
-        removeTag(x.tag); removeTag(env.tag);
-        add(phrase,Math.min(1.30,1.10+emphasisBoost));
-      }
-    });
-  };
-
-  // ── 自然语义编排层 ─────────────────────────────────────
-  // 词库负责“词是什么”，这里负责“这些词在句子里是什么关系”。
-  // 只使用已经识别出的词库标签；关系、修饰和强调只改变组织方式与权重。
-  const semanticSource = [...tags].map(x=>({
-    tag:x.tag, weight:x.weight, category:(allVocabulary().find(v=>v.canonical_tag===x.tag)||{}).category||"unknown"
+  // ── 2. 词库命中 → 语义节点 ────────────────────────────
+  const nodes=hits.map(h=>({
+    tag:h.tag,entry:h.entry,pos:h.pos,end:h.end,alias:h.alias,
+    category:h.entry?.category||"unknown"
   }));
 
-  const hasAny = (...xs) => xs.some(x=>present.has(x));
-  const boost = (tag, amount) => {
-    const x=tags.find(v=>v.tag===tag);
-    if(x) x.weight=Math.min(1.30,Math.max(0.98,x.weight+amount));
+  const actions=new Set(["action","pose"]);
+  const appearances=new Set(["appearance","hair","eyes","face"]);
+  const wearables=new Set(["clothing","accessories","footwear"]);
+  const places=new Set(["environment","nature","architecture","vehicle","object","animal","food"]);
+  const cameras=new Set(["camera","composition","lighting"]);
+
+  const actionNodes=nodes.filter(n=>actions.has(n.category));
+  const objectNodes=nodes.filter(n=>places.has(n.category));
+  const appearanceNodes=nodes.filter(n=>appearances.has(n.category));
+  const clothingNodes=nodes.filter(n=>wearables.has(n.category));
+
+  // ── 3. 中文语义关系识别 ───────────────────────────────
+  // 每条关系先建立“事件”，最终事件才会输出成 NAI 词组。
+  const phrases=[];
+  const consumed=new Set();
+  const addPhrase=(tag,weight=1.14,consume=[])=>{
+    if(!tag) return;
+    phrases.push({tag,weight});
+    consume.forEach(x=>consumed.add(x));
   };
 
-  // 根据标签在中文句子中的邻近关系建立“语义簇”。
-  const vocabEntries=allVocabulary();
-  const entryFor=tag=>vocabEntries.find(v=>v.canonical_tag===tag)||null;
-
-  // 词组编排必须在后续权重/排序层之前执行；否则语义词组只会被定义而不会生效。
-  applySemanticGroups();
-
-  const aliasPositions=[];
-  semanticSource.forEach(node=>{
-    const e=entryFor(node.tag);
-    const aliases=[node.tag,...(e?.aliases||[])].filter(Boolean);
-    let pos=-1, matched="";
-    aliases.forEach(a=>{
-      const p=text.indexOf(a);
-      if(p>=0 && (pos<0||p<pos)){pos=p;matched=a;}
-    });
-    aliasPositions.push({...node,pos,matched});
-  });
-
-  const phraseFor = (members, connector) => {
-    const names=members.filter(Boolean);
-    return names.length ? names.join(" "+connector+" ") : "";
+  const hasChinese=re=>re.test(textN);
+  const local=(p1,p2,max=28)=>{
+    return Math.abs(p1-p2)<=max;
   };
 
-  // 中文修饰语 → 最近的动作/外貌/服装标签。
-  const modifierDelta = tag => {
-    const e=entryFor(tag);
-    const aliases=[tag,...(e?.aliases||[])].filter(Boolean);
-    const pos=aliases.map(a=>text.indexOf(a)).filter(x=>x>=0).sort((a,b)=>a-b)[0];
-    if(pos==null) return 0;
-    const before=text.slice(Math.max(0,pos-12),pos);
-    let d=emphasisBoost;
-    if(/非常|极其|特别|格外|强烈|明显|紧紧|牢牢|用力|深深/.test(before)) d+=0.05;
-    if(/有些|略显|隐约|淡淡|轻微|稍微/.test(before)) d-=0.03;
-    if(/最重要|重点|核心|关键|一定要|必须|不能丢|务必/.test(before)) d+=0.08;
-    return d;
-  };
+  // 人与人关系：优先级最高，避免被“手/看/站”等普通词拆散。
+  if(/牵着手|牵住手|牵手|手牵手/.test(textN)){
+    addPhrase("holding hands",1.22,["holding hands"]);
+  }else if(/拥抱|抱着|抱住/.test(textN)){
+    const t=has("hugging")?"hugging":"hugging";
+    addPhrase(t,1.20,[t]);
+  }else if(/亲吻|接吻|吻着/.test(textN)){
+    addPhrase(has("kiss")?"kiss":"kissing",1.20,has("kiss")?["kiss"]:[]);
+  }else if(/对视|看着对方|互相看|彼此对视/.test(textN)){
+    addPhrase(has("looking at each other")?"looking at each other":"looking at each other",1.18,["looking at each other"]);
+  }else if(/面对面|面对彼此|互相面对/.test(textN)){
+    if(/坐着|坐在|坐于/.test(textN) && has("sitting")){
+      addPhrase("facing each other while sitting",1.18,["facing each other","sitting"]);
+    }else if(has("facing each other")){
+      addPhrase("facing each other",1.16,["facing each other"]);
+    }
+  }
 
-  semanticSource.forEach(x=>{ boost(x.tag,modifierDelta(x.tag)); });
+  // 动作 + 身体部位：例如“伸出手指”必须理解为动作，而不是 finger 单词。
+  const pointingText=/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/;
+  if(pointingText.test(textN)){
+    addPhrase(has("pointing")?"pointing":"pointing with finger",1.18,has("pointing")?["pointing"]:[]);
+    const fingerNode=nodes.find(n=>/finger|手指/i.test(n.tag+" "+n.alias));
+    if(fingerNode) consumed.add(fingerNode.tag);
+  }
 
-  // 将“颜色/长度 + 主体”理解为同一语义单元，而不是两个互不相关的标签。
-  const groupedPairs=[
-    [["black hair","long hair"],"black long hair"],
-    [["white hair","long hair"],"white long hair"],
-    [["blonde hair","long hair"],"blonde long hair"],
-    [["silver hair","long hair"],"silver long hair"],
-    [["red hair","long hair"],"red long hair"],
-    [["blue hair","long hair"],"blue long hair"],
-    [["brown hair","long hair"],"brown long hair"],
-    [["pink hair","long hair"],"pink long hair"],
-    [["purple hair","long hair"],"purple long hair"],
-    [["black hair","short hair"],"black short hair"],
-    [["white hair","short hair"],"white short hair"],
-    [["blonde hair","short hair"],"blonde short hair"],
-    [["silver hair","short hair"],"silver short hair"],
-    [["black suit","black"],"black suit"],
-    [["black coat","black"],"black coat"],
-    [["white dress","white"],"white dress"],
-    [["school uniform","white"],"white school uniform"]
+  // 动作 + 宾语：使用词库节点的位置和中文句式判断关系。
+  const relationPatterns=[
+    {re:/(坐在|坐着|坐于)/,prep:"on",cats:["object","architecture","environment"],max:24},
+    {re:/(站在|站着|站于)/,prep:"at",cats:["object","architecture","environment"],max:24},
+    {re:/(靠着|倚着|倚靠)/,prep:"against",cats:["object","architecture"],max:24},
+    {re:/(看着|望着|注视着|凝视着|盯着)/,prep:"at",cats:["object","animal","food"],max:22},
+    {re:/(指着|指向|指给)/,prep:"at",cats:["object","architecture","vehicle","animal"],max:22}
   ];
-
-  // 只有词库本身存在的标签才可作为最终基础成员；组合名是“展示短语”，不会加入词库。
-  const renderGroup=(members, label, baseWeight)=>{
-    const found=members.filter(t=>present.has(t));
-    if(found.length<2) return false;
-    found.forEach(removeTag);
-    const w=Math.min(1.30,Math.max(1.00,baseWeight+emphasisBoost+found.reduce((s,t)=>s+modifierDelta(t),0)));
-    add(label,w);
-    return true;
-  };
-
-  groupedPairs.forEach(([members,label])=>renderGroup(members,label,1.07));
-
-  // 动作关系：动作 + 宾语/环境不是简单拼接，而是按句法邻近度形成一个主语事件。
-  const relationRules=[
-    {base:"holding umbrella", object:/透明|透明的/, label:"holding a transparent umbrella"},
-    {base:"holding umbrella", object:/黑色|黑/, label:"holding a black umbrella"},
-    {base:"holding umbrella", object:/白色|白/, label:"holding a white umbrella"},
-    {base:"holding flower", object:/红色|红/, label:"holding a red flower"},
-    {base:"holding flower", object:/白色|白/, label:"holding a white flower"}
-  ];
-  relationRules.forEach(r=>{
-    if(present.has(r.base)&&r.object.test(text)){
-      removeTag(r.base);
-      add(r.label,Math.min(1.30,1.12+emphasisBoost+modifierDelta(r.base)));
+  relationPatterns.forEach(rule=>{
+    if(!rule.re.test(textN)) return;
+    const act=actionNodes
+      .filter(n=>rule.re.test((n.alias||"")) || /sitting|standing|looking|pointing/i.test(n.tag))
+      .sort((a,b)=>Math.abs(a.pos-(textN.search(rule.re)))-Math.abs(b.pos-(textN.search(rule.re))))[0];
+    const obj=objectNodes
+      .filter(n=>rule.cats.includes(n.category))
+      .sort((a,b)=>Math.abs(a.pos-(act?.pos??0))-Math.abs(b.pos-(act?.pos??0)))[0];
+    if(act&&obj&&local(act.pos,obj.pos,rule.max)){
+      addPhrase(act.tag+" "+rule.prep+" "+obj.tag,1.15,[act.tag,obj.tag]);
     }
   });
 
-  // 事件 + 环境：只有动作和环境在同一局部语境中出现时才组合。
-  const eventRules=[
-    [["walking","rain"],"walking in the rain"],
-    [["standing","rain"],"standing in the rain"],
-    [["running","rain"],"running in the rain"],
-    [["walking","night"],"walking at night"],
-    [["standing","night"],"standing at night"],
-    [["rain","night"],"rainy night"]
+  // 动作 + 环境：只有局部事件成立时才合并。
+  const envNodes=nodes.filter(n=>n.category==="environment");
+  actionNodes.forEach(act=>{
+    const env=envNodes
+      .filter(e=>local(act.pos,e.pos,30))
+      .sort((a,b)=>Math.abs(a.pos-act.pos)-Math.abs(b.pos-act.pos))[0];
+    if(!env) return;
+    let phrase="";
+    if(/走|行走|漫步/.test(textN)&&/walking/i.test(act.tag)) phrase=act.tag+" in "+env.tag;
+    else if(/站/.test(textN)&&/standing/i.test(act.tag)) phrase=act.tag+" in "+env.tag;
+    else if(/坐/.test(textN)&&/sitting/i.test(act.tag)) phrase=act.tag+" in "+env.tag;
+    if(phrase) addPhrase(phrase,1.12,[act.tag,env.tag]);
+  });
+
+  // ── 4. 修饰语归属：颜色/长度/服装等跟随最近的中心名词 ───
+  const modifiers=[];
+  const colorMap=[
+    ["黑","black"],["白","white"],["红","red"],["蓝","blue"],["绿","green"],
+    ["黄","yellow"],["紫","purple"],["粉","pink"],["棕","brown"],["灰","gray"],["银","silver"],["金","blonde"]
   ];
-  eventRules.forEach(([members,label])=>{
-    if(members.every(t=>present.has(t))){
-      const before=members.map(t=>indexOfTag(t)).filter(i=>i>=0);
-      const span=before.length?Math.max(...before)-Math.min(...before):99;
-      if(span<=6){
-        const w=Math.min(1.30,1.07+emphasisBoost+members.reduce((s,t)=>s+modifierDelta(t),0));
-        members.forEach(removeTag);
-        add(label,w);
-      }
-    }
-  });
-
-  // 关系动词优先级高于普通环境词；强调词只提高相关节点，不会把整句全部加重。
-  ["hugging","holding hands","looking at each other","facing each other","kiss","holding umbrella","holding flower"].forEach(tag=>{
-    if(present.has(tag)) boost(tag,0.04+Math.max(0,modifierDelta(tag)));
-  });
-
-  // 如果句子明确指出“不能丢”的细节，只提升该局部语义簇，而不是全局加权。
-  const critical=/最重要的是|重点是|核心是|关键是|一定要|必须有|不能丢|不要丢|务必/;
-  if(critical.test(text)){
-    const clauses=text.split(/[，,。；;！!？?]/).map(s=>s.trim()).filter(Boolean);
-    clauses.forEach(clause=>{
-      tags.forEach(x=>{
-        const e=entryFor(x.tag);
-        const words=[x.tag,...(e?.aliases||[])].filter(Boolean);
-        if(words.some(w=>clause.includes(w))) x.weight=Math.min(1.30,x.weight+0.07);
+  const centers=[
+    {re:/头发|发型/,type:"hair"},
+    {re:/眼睛|眼眸|眼瞳|眼/,type:"eyes"},
+    {re:/裙子|裙装|连衣裙|裙/,type:"dress"},
+    {re:/西装|套装/,type:"suit"},
+    {re:/大衣|外套|风衣/,type:"coat"},
+    {re:/花/,type:"flower"},
+    {re:/伞/,type:"umbrella"}
+  ];
+  centers.forEach(c=>{
+    const cm=[...textN.matchAll(c.re)];
+    cm.forEach(x=>{
+      const before=textN.slice(Math.max(0,x.index-10),x.index);
+      colorMap.forEach(([cn,en])=>{
+        if(new RegExp(cn+"色?").test(before)){
+          const tagByType={
+            hair:en+" hair",eyes:en==="blonde"?"yellow eyes":en+" eyes",
+            dress:en+" dress",suit:en+" suit",coat:en+" coat",
+            flower:en+" flower",umbrella:en+" umbrella"
+          }[c.type];
+          if(entry(tagByType)) modifiers.push({tag:tagByType,pos:x.index});
+        }
       });
     });
+  });
+
+  // ── 5. 角色管理器属性：角色名出现时，把属性绑定到角色，而不是全局乱加。
+  const matchedChars=chars.filter(c=>c.name&&textN.includes(c.name));
+  const characterTags=[];
+  matchedChars.forEach(c=>{
+    const props=[c.hair,c.eye,c.cloth,c.feature].filter(Boolean);
+    props.forEach(p=>{
+      const hs=matchVocabulary(p);
+      hs.forEach(e=>addUnique(characterTags,e.canonical_tag,1.22));
+    });
+    const g=c.gender==="男"?"1boy":c.gender==="女"?"1girl":null;
+    if(g) addUnique(characterTags,g,1.08);
+  });
+
+  // ── 6. 基础标签：命中词库但没有被更高层事件消费的标签才保留。
+  const output=[];
+  personTags.forEach(t=>addUnique(output,t,1));
+  characterTags.forEach(x=>addUnique(output,x.tag,x.weight));
+
+  nodes.forEach(n=>{
+    if(consumed.has(n.tag)) return;
+    // 颜色碎片不单独输出，已经由“颜色+中心名词”处理。
+    if(modifiers.some(x=>x.tag===n.tag)) return;
+    // generic person tokens不作为普通词库碎片。
+    if(/^(1|2|3)(boy|girl|person|people|boys|girls)$/.test(n.tag)) return;
+    addUnique(output,n.tag,
+      appearances.has(n.category)?1.16:
+      wearables.has(n.category)?1.12:
+      actions.has(n.category)?1.10:
+      1);
+  });
+
+  modifiers.forEach(x=>{
+    if(!consumed.has(x.tag)) addUnique(output,x.tag,1.16);
+  });
+
+  // 事件词组放到对应基础标签的位置，但不再把组成它们的 token 重复输出。
+  phrases.forEach(p=>{
+    p.tag=p.tag.replace(/\s+/g," ").trim();
+    if(!output.some(x=>x.tag===p.tag)) output.push(p);
+    p.tag.split(/\s+(?:on|at|in|against|with)\s+/).forEach(part=>{
+      // 只有完整 canonical tag 才消费；组合短语本身不进入词库。
+      if(entry(part)) {
+        const i=output.findIndex(x=>x.tag===part);
+        if(i>=0) output.splice(i,1);
+      }
+    });
+  });
+
+  // holding hands / pointing 等关系短语即使词库没有完全相同的组合，也应保留。
+  // finger 这种身体部位只有在“单纯描述手指外观”时才输出。
+  if(pointingText.test(textN) && has("finger")){
+    const i=output.findIndex(x=>x.tag==="finger");
+    if(i>=0) output.splice(i,1);
   }
 
-  // 未达到可靠组合条件的标签原样保留，避免“为了像自然语言而丢词”。
-  tags.forEach(x=>{
-    if(x.weight!==1) x.weight=Math.round(Math.min(1.30,Math.max(0.98,x.weight))*100)/100;
-  });
-
-  // 稳定排序：人物 → 外貌/服装 → 动作/关系 → 环境 → 构图。
-  const order={person:0,appearance:1,hair:1,eyes:1,face:1,clothing:2,accessories:2,action:3,pose:3,environment:4,lighting:5,composition:6,camera:6};
-  const categoryOf=tag=>entryFor(tag)?.category||"";
-  tags.sort((a,b)=>(order[categoryOf(a.tag)]??7)-(order[categoryOf(b.tag)]??7));
-
-  // 直接输入的英文NAI标签透传
-  const englishTokens=text.match(/[A-Za-z][A-Za-z0-9_-]{2,}(?:\s+[A-Za-z][A-Za-z0-9_-]{2,})?/g)||[];
-  englishTokens.forEach(x=>{
-    const t=x.trim().toLowerCase();
-    if(!/^(the|and|with|this|that|girl|boy|woman|man|character|person|wearing|standing|sitting|looking|very|beautiful|scene)$/i.test(t)) add(t,1);
-  });
-
-  // 手选标签
-  selected.forEach(t=>add(t,1.08));
-  const appearanceCategories=new Set(["appearance","hair","eyes","face"]);
-  const explicitAppearance=tags.some(x=>{
-    const e=entryFor(x.tag);
-    return e && appearanceCategories.has(e.category);
-  });
-  if(genericPerson&&!matchedChars.length&&!explicitAppearance){
-    const pIndex=tags.findIndex(x=>/^\d+(?:girl|boy|people|person)$/.test(x.tag));
-    const appearanceTag={tag:"[APPEARANCE]",weight:1};
-    if(pIndex>=0) tags.splice(pIndex+1,0,appearanceTag); else tags.unshift(appearanceTag);
+  // 明确“手指很纤细”是身体部位外观，不是 pointing。
+  if(/手指.{0,5}(纤细|修长|细长|漂亮|白皙)/.test(textN)){
+    if(has("finger") && !output.some(x=>x.tag==="finger")) addUnique(output,"finger",1.10);
+    if(has("slender fingers") && !output.some(x=>x.tag==="slender fingers")) addUnique(output,"slender fingers",1.12);
   }
 
-  // 意图修饰
-  const effectiveIntent = intent!=="none" ? intent :
-    (/张力|紧张|压迫感|冲突感/.test(text)?"tension":
-     /电影感|电影般|镜头感|影视感/.test(text)?"cinematic":
-     /孤独|寂寥|空旷|疏离/.test(text)?"lonely":"none");
+  // ── 7. 颜色/长度复合：让 NAI 接收到语义单元，而不是黑发+长发两个孤立 token。
+  const combinePairs=[
+    [["black hair","long hair"],"black long hair"],[["white hair","long hair"],"white long hair"],
+    [["red hair","long hair"],"red long hair"],[["blue hair","long hair"],"blue long hair"],
+    [["brown hair","long hair"],"brown long hair"],[["pink hair","long hair"],"pink long hair"],
+    [["purple hair","long hair"],"purple long hair"],[["black hair","short hair"],"black short hair"],
+    [["white hair","short hair"],"white short hair"],[["black suit","black"],"black suit"],
+    [["black coat","black"],"black coat"],[["white dress","white"],"white dress"]
+  ];
+  combinePairs.forEach(([members,label])=>{
+    const found=members.filter(t=>output.some(x=>x.tag===t)||hits.some(h=>h.tag===t));
+    if(found.length<2) return;
+    if(!entry(label)) return;
+    members.forEach(t=>{const i=output.findIndex(x=>x.tag===t);if(i>=0)output.splice(i,1);});
+    addUnique(output,label,1.16);
+  });
 
-  if(effectiveIntent==="tension")[
-    ["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],
-    ["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]
-  ].forEach(x=>add(x[0],x[1]));
-  if(effectiveIntent==="cinematic")[
-    ["cinematic composition",1.08],["cinematic lighting",1.08],
-    ["depth of field",1.06],["dramatic perspective",1.04]
-  ].forEach(x=>add(x[0],x[1]));
-  if(effectiveIntent==="lonely")[
-    ["wide shot",1.06],["off-center composition",1.08],
-    ["negative space",1.12],["soft atmospheric lighting",1.04]
-  ].forEach(x=>add(x[0],x[1]));
+  // ── 8. [APPEARANCE]：没有明确外貌时保留占位，不因动作/场景而消失。
+  const explicitAppearance=output.some(x=>{
+    const e=entry(x.tag);
+    return e && appearances.has(e.category);
+  });
+  const genericPerson=personTags.some(x=>/boy|girl|person|people|solo/.test(x))||matchedChars.length>0;
+  if(genericPerson&&!explicitAppearance&&!output.some(x=>x.tag==="[APPEARANCE]")){
+    const i=output.findIndex(x=>/^(1|2|3)(boy|girl|boys|girls|people|person)$/.test(x.tag));
+    const ap={tag:"[APPEARANCE]",weight:1};
+    if(i>=0) output.splice(i+1,0,ap); else output.unshift(ap);
+  }
 
-  if(conflicts.length) $("#status").textContent="检测到角色冲突："+conflicts.join("；");
-  return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
+  // ── 9. 视觉意图只影响构图，不污染主体语义。 ───────────
+  const effectiveIntent=intent!=="none"?intent:
+    (/张力|紧张|压迫感|冲突感/.test(source)?"tension":
+     /电影感|电影般|镜头感|影视感/.test(source)?"cinematic":
+     /孤独|寂寥|空旷|疏离/.test(source)?"lonely":"none");
+
+  const intentTags={
+    tension:[["low angle",1.08],["dynamic composition",1.08],["dramatic lighting",1.08]],
+    cinematic:[["cinematic composition",1.08],["cinematic lighting",1.08],["depth of field",1.06]],
+    lonely:[["wide shot",1.06],["negative space",1.08],["off-center composition",1.06]]
+  };
+  (intentTags[effectiveIntent]||[]).forEach(([t,w])=>{if(entry(t))addUnique(output,t,w)});
+
+  // 稳定排序：人物→外貌→服装→关系/动作→环境→镜头。
+  const order={person:0,appearance:1,hair:1,eyes:1,face:1,clothing:2,accessories:2,footwear:2,
+    action:3,pose:3,environment:4,nature:4,object:4,animal:4,food:4,architecture:4,vehicle:4,
+    lighting:5,composition:6,camera:6};
+  const category=x=>entry(x.tag)?.category||"";
+  output.sort((a,b)=>{
+    const oa=order[category(a.tag)]??3, ob=order[category(b.tag)]??3;
+    return oa-ob;
+  });
+
+  // 权重格式化；普通标签不加权，真正需要强调的语义单元才加权。
+  return output
+    .filter((x,i,a)=>a.findIndex(y=>y.tag===x.tag)===i)
+    .map(x=>x.weight!==1?"("+x.tag+":"+Math.min(1.30,x.weight).toFixed(2)+")":x.tag)
+    .join(", ");
 }
 
 $("#translate").onclick=async()=>{
