@@ -294,6 +294,133 @@ const CAT_LABEL = {
   nsfw_toys:     "🔞 情趣道具",
 };
 
+/*
+ * OPEN-SOURCE TAG SUPPLEMENT
+ * Source basis: public NovelAI/Danbooru tag datasets, including
+ * PYU224/tagdb-updater (https://github.com/PYU224/tagdb-updater).
+ * These are additive entries only: the original BUILT_IN_VOCAB is untouched.
+ * Chinese aliases below are local mappings for this application's parser.
+ */
+const OPEN_SOURCE_SUPPLEMENT_VOCAB = [
+  // anatomy / body
+  {canonical_tag:"head",aliases:["头","头部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"neck",aliases:["脖子","颈部","颈"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"shoulders",aliases:["肩膀","肩部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"chest",aliases:["胸部","胸口"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"waist",aliases:["腰","腰部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"hips",aliases:["臀部","胯部","髋部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"stomach",aliases:["腹部","肚子","腹部位置"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"back",aliases:["背部","后背"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"arm",aliases:["手臂","胳膊"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"elbow",aliases:["手肘","肘部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"wrist",aliases:["手腕","腕部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"hand",aliases:["手","手部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"finger",aliases:["手指","手指部位"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"leg",aliases:["腿","腿部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"thigh",aliases:["大腿","大腿部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"knee",aliases:["膝盖","膝部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"calf",aliases:["小腿","小腿部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"ankle",aliases:["脚踝","踝部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"foot",aliases:["脚","脚部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"toes",aliases:["脚趾","脚趾部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"skin",aliases:["皮肤"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // daily objects / furniture
+  {canonical_tag:"table",aliases:["桌子","桌面"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"desk",aliases:["书桌","办公桌"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"chair",aliases:["椅子","座椅"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"sofa",aliases:["沙发"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bed",aliases:["床","床铺"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"pillow",aliases:["枕头"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"blanket",aliases:["毯子","毛毯"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bookshelf",aliases:["书架","书柜"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"book",aliases:["书","书本"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"notebook",aliases:["笔记本","本子"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"computer",aliases:["电脑","计算机"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"laptop",aliases:["笔记本电脑"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"smartphone",aliases:["手机","智能手机"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"clock",aliases:["钟","时钟"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"mirror",aliases:["镜子","镜面"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"lamp",aliases:["台灯","灯"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"umbrella",aliases:["雨伞","伞"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bag",aliases:["包","包包","手提包"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"backpack",aliases:["背包"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"basket",aliases:["篮子","篮筐"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bottle",aliases:["瓶子","水瓶"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"cup",aliases:["杯子","水杯"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"plate",aliases:["盘子","餐盘"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"window",aliases:["窗户","窗"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"door",aliases:["门","房门"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"curtains",aliases:["窗帘","帘子"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // nature / scenery
+  {canonical_tag:"sky",aliases:["天空","天"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"cloud",aliases:["云","云朵"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"tree",aliases:["树","树木"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"grass",aliases:["草","草地"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"flower",aliases:["花","鲜花"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"leaf",aliases:["叶子","树叶"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"mountain",aliases:["山","山脉"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"lake",aliases:["湖","湖泊"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"river",aliases:["河","河流"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"ocean",aliases:["海","大海","海洋"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"beach",aliases:["海滩","沙滩"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"forest",aliases:["森林","树林"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"park",aliases:["公园"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"garden",aliases:["花园","庭院"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"sun",aliases:["太阳"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"moon",aliases:["月亮","月"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"starry sky",aliases:["星空","满天星"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // animals
+  {canonical_tag:"cat",aliases:["猫","猫咪"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"dog",aliases:["狗","狗狗"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bird",aliases:["鸟","鸟类"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"rabbit",aliases:["兔子","兔"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"horse",aliases:["马"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"butterfly",aliases:["蝴蝶"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"fish",aliases:["鱼"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // food / drink
+  {canonical_tag:"food",aliases:["食物","食物类"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"coffee",aliases:["咖啡"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"tea",aliases:["茶","茶水"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"cake",aliases:["蛋糕"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bread",aliases:["面包"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"ice cream",aliases:["冰淇淋","冰激凌"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"fruit",aliases:["水果"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"apple",aliases:["苹果"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // architecture / places
+  {canonical_tag:"house",aliases:["房子","住宅"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"building",aliases:["建筑","建筑物"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"school",aliases:["学校"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"classroom",aliases:["教室"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bedroom",aliases:["卧室"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"kitchen",aliases:["厨房"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bathroom",aliases:["浴室","卫生间"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"balcony",aliases:["阳台"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bridge",aliases:["桥","桥梁"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"shrine",aliases:["神社"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // vehicles
+  {canonical_tag:"car",aliases:["汽车","轿车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bus",aliases:["公交车","巴士"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"train",aliases:["火车","列车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"bicycle",aliases:["自行车","单车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"motorcycle",aliases:["摩托车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"airplane",aliases:["飞机","客机"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
+
+  // useful atmosphere / scene tags
+  {canonical_tag:"indoors",aliases:["室内","在室内"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"outdoors",aliases:["室外","户外","在户外"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"city",aliases:["城市","都市"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"countryside",aliases:["乡村","郊外","农村"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"road",aliases:["道路","公路"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"alley",aliases:["小巷","巷子"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"sidewalk",aliases:["人行道"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
+  {canonical_tag:"night sky",aliases:["夜空"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"}
+];
 // ── 词库合并 ──────────────────────────────────────────────
 function allVocabulary(){
   const merged = [...BUILT_IN_VOCAB, ...OPEN_SOURCE_SUPPLEMENT_VOCAB, ...customVocabulary.map(e=>({...e,source:"custom"}))];
@@ -524,133 +651,7 @@ function parse(text){
     [/紧张|压迫感|冲突感/,"dramatic lighting"],
   ];
 
-/*
- * OPEN-SOURCE TAG SUPPLEMENT
- * Source basis: public NovelAI/Danbooru tag datasets, including
- * PYU224/tagdb-updater (https://github.com/PYU224/tagdb-updater).
- * These are additive entries only: the original BUILT_IN_VOCAB is untouched.
- * Chinese aliases below are local mappings for this application's parser.
- */
-const OPEN_SOURCE_SUPPLEMENT_VOCAB = [
-  // anatomy / body
-  {canonical_tag:"head",aliases:["头","头部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"neck",aliases:["脖子","颈部","颈"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"shoulders",aliases:["肩膀","肩部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"chest",aliases:["胸部","胸口"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"waist",aliases:["腰","腰部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"hips",aliases:["臀部","胯部","髋部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"stomach",aliases:["腹部","肚子","腹部位置"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"back",aliases:["背部","后背"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"arm",aliases:["手臂","胳膊"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"elbow",aliases:["手肘","肘部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"wrist",aliases:["手腕","腕部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"hand",aliases:["手","手部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"finger",aliases:["手指","手指部位"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"leg",aliases:["腿","腿部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"thigh",aliases:["大腿","大腿部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"knee",aliases:["膝盖","膝部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"calf",aliases:["小腿","小腿部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"ankle",aliases:["脚踝","踝部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"foot",aliases:["脚","脚部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"toes",aliases:["脚趾","脚趾部"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"skin",aliases:["皮肤"],category:"anatomy",related:[],conflicts:[],source:"open-source-supplement"},
 
-  // daily objects / furniture
-  {canonical_tag:"table",aliases:["桌子","桌面"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"desk",aliases:["书桌","办公桌"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"chair",aliases:["椅子","座椅"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"sofa",aliases:["沙发"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bed",aliases:["床","床铺"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"pillow",aliases:["枕头"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"blanket",aliases:["毯子","毛毯"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bookshelf",aliases:["书架","书柜"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"book",aliases:["书","书本"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"notebook",aliases:["笔记本","本子"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"computer",aliases:["电脑","计算机"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"laptop",aliases:["笔记本电脑"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"smartphone",aliases:["手机","智能手机"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"clock",aliases:["钟","时钟"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"mirror",aliases:["镜子","镜面"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"lamp",aliases:["台灯","灯"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"umbrella",aliases:["雨伞","伞"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bag",aliases:["包","包包","手提包"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"backpack",aliases:["背包"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"basket",aliases:["篮子","篮筐"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bottle",aliases:["瓶子","水瓶"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"cup",aliases:["杯子","水杯"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"plate",aliases:["盘子","餐盘"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"window",aliases:["窗户","窗"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"door",aliases:["门","房门"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"curtains",aliases:["窗帘","帘子"],category:"object",related:[],conflicts:[],source:"open-source-supplement"},
-
-  // nature / scenery
-  {canonical_tag:"sky",aliases:["天空","天"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"cloud",aliases:["云","云朵"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"tree",aliases:["树","树木"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"grass",aliases:["草","草地"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"flower",aliases:["花","鲜花"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"leaf",aliases:["叶子","树叶"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"mountain",aliases:["山","山脉"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"lake",aliases:["湖","湖泊"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"river",aliases:["河","河流"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"ocean",aliases:["海","大海","海洋"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"beach",aliases:["海滩","沙滩"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"forest",aliases:["森林","树林"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"park",aliases:["公园"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"garden",aliases:["花园","庭院"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"sun",aliases:["太阳"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"moon",aliases:["月亮","月"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"starry sky",aliases:["星空","满天星"],category:"nature",related:[],conflicts:[],source:"open-source-supplement"},
-
-  // animals
-  {canonical_tag:"cat",aliases:["猫","猫咪"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"dog",aliases:["狗","狗狗"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bird",aliases:["鸟","鸟类"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"rabbit",aliases:["兔子","兔"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"horse",aliases:["马"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"butterfly",aliases:["蝴蝶"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"fish",aliases:["鱼"],category:"animal",related:[],conflicts:[],source:"open-source-supplement"},
-
-  // food / drink
-  {canonical_tag:"food",aliases:["食物","食物类"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"coffee",aliases:["咖啡"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"tea",aliases:["茶","茶水"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"cake",aliases:["蛋糕"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bread",aliases:["面包"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"ice cream",aliases:["冰淇淋","冰激凌"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"fruit",aliases:["水果"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"apple",aliases:["苹果"],category:"food",related:[],conflicts:[],source:"open-source-supplement"},
-
-  // architecture / places
-  {canonical_tag:"house",aliases:["房子","住宅"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"building",aliases:["建筑","建筑物"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"school",aliases:["学校"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"classroom",aliases:["教室"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bedroom",aliases:["卧室"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"kitchen",aliases:["厨房"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bathroom",aliases:["浴室","卫生间"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"balcony",aliases:["阳台"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bridge",aliases:["桥","桥梁"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"shrine",aliases:["神社"],category:"architecture",related:[],conflicts:[],source:"open-source-supplement"},
-
-  // vehicles
-  {canonical_tag:"car",aliases:["汽车","轿车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bus",aliases:["公交车","巴士"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"train",aliases:["火车","列车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"bicycle",aliases:["自行车","单车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"motorcycle",aliases:["摩托车"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"airplane",aliases:["飞机","客机"],category:"vehicle",related:[],conflicts:[],source:"open-source-supplement"},
-
-  // useful atmosphere / scene tags
-  {canonical_tag:"indoors",aliases:["室内","在室内"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"outdoors",aliases:["室外","户外","在户外"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"city",aliases:["城市","都市"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"countryside",aliases:["乡村","郊外","农村"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"road",aliases:["道路","公路"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"alley",aliases:["小巷","巷子"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"sidewalk",aliases:["人行道"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"},
-  {canonical_tag:"night sky",aliases:["夜空"],category:"environment",related:[],conflicts:[],source:"open-source-supplement"}
-];
 
   semanticMap.forEach(([re,tag])=>{ if(re.test(text)) add(tag, 1.08); });
 
