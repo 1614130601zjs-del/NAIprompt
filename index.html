@@ -784,7 +784,7 @@ function parse(text){
     {re:/伞/,type:"umbrella"}
   ];
   centers.forEach(c=>{
-    const cm=[...textN.matchAll(new RegExp(c.re.source, c.re.flags.includes("g") ? c.re.flags : c.re.flags + "g"))];
+    const centerRe=new RegExp(c.re.source,c.re.flags.replace(/g/g,"")+"g");\n    const cm=[];\n    let centerMatch;\n    while((centerMatch=centerRe.exec(textN))!==null){\n      cm.push(centerMatch);\n      if(centerMatch[0]==="") centerRe.lastIndex++;\n    }
     cm.forEach(x=>{
       const before=textN.slice(Math.max(0,x.index-10),x.index);
       colorMap.forEach(([cn,en])=>{
