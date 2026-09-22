@@ -692,6 +692,66 @@ function parse(text){
   }
 
 
+  // ── 通用中文句子理解层 ───────────────────────────────────
+  // 优先从完整词库寻找最长中文别名，再结合句子中的动作/关系词，
+  // 将一句话拆成“人物 + 属性 + 动作 + 场景”，而不是只能依赖少量正则。
+  const sentenceVocab = allVocabulary()
+    .filter(e=>e && e.canonical_tag &&
+      !["nsfw_lingerie","nsfw_male","nsfw_legwear","nsfw_bdsm","nsfw_toys"].includes(e.category))
+    .map(e=>({...e,_aliases:[e.canonical_tag,...(e.aliases||[])]
+      .filter(Boolean).sort((a,b)=>String(b).length-String(a).length)}));
+  const sentenceMatched = new Set(tags.map(x=>x.tag));
+  const sentenceHits = [];
+  sentenceVocab.forEach(e=>e._aliases.forEach(alias=>{
+    const a=String(alias).trim();
+    if(!a || /^[A-Za-z0-9 _-]+$/.test(a) || a.length<2) return;
+    let from=0;
+    while(true){
+      const p=text.indexOf(a,from);
+      if(p<0) break;
+      sentenceHits.push({entry:e,alias:a,pos:p,end:p+a.length});
+      from=p+a.length;
+    }
+  }));
+  sentenceHits.sort((a,b)=>(b.alias.length-a.alias.length)||(a.pos-b.pos));
+  const occupied=[];
+  sentenceHits.forEach(hit=>{
+    if(occupied.some(r=>hit.pos<r.end && hit.end>r.pos)) return;
+    occupied.push(hit);
+    if(sentenceMatched.has(hit.entry.canonical_tag)) return;
+    let w=1;
+    if(["appearance","hair","eyes","face"].includes(hit.entry.category)) w=1.18;
+    else if(["action","pose"].includes(hit.entry.category)) w=1.14;
+    else if(["clothing","accessories","footwear"].includes(hit.entry.category)) w=1.10;
+    add(hit.entry.canonical_tag,w);
+    sentenceMatched.add(hit.entry.canonical_tag);
+  });
+
+  // 中文功能词只解释关系，不直接生成不存在的英文标签。
+  const sentenceRelations=[
+    [/穿着|穿上|身穿/,"clothing"],
+    [/拿着|拿了|手里拿着|手持|握着|捧着/,"object"],
+    [/站在|站着|站于/,"standing"],
+    [/坐在|坐着|坐于/,"sitting"],
+    [/走在|走着|正在走|行走于/,"walking"],
+    [/跑在|跑着|正在跑|奔跑于/,"running"],
+    [/看着|望着|注视着|凝视着|盯着|对视/,"looking"]
+  ];
+  sentenceRelations.forEach(([re,kind])=>{
+    if(!re.test(text)) return;
+    tags.forEach(x=>{
+      const e=allVocabulary().find(v=>v.canonical_tag===x.tag);
+      if(!e) return;
+      if(kind==="clothing" && ["clothing","accessories","footwear"].includes(e.category)) x.weight=Math.min(1.30,x.weight+0.04);
+      if(kind==="object" && ["object","nature","animal","food","accessories"].includes(e.category)) x.weight=Math.min(1.30,x.weight+0.03);
+      if(kind==="standing" && x.tag==="standing") x.weight=Math.min(1.30,x.weight+0.04);
+      if(kind==="sitting" && x.tag==="sitting") x.weight=Math.min(1.30,x.weight+0.04);
+      if(kind==="walking" && x.tag==="walking") x.weight=Math.min(1.30,x.weight+0.04);
+      if(kind==="running" && x.tag==="running") x.weight=Math.min(1.30,x.weight+0.04);
+      if(kind==="looking" && ["looking at each other","facing each other"].includes(x.tag)) x.weight=Math.min(1.30,x.weight+0.05);
+    });
+  });
+
   // ── 通用句法/短语解析层 ─────────────────────────────────
   // 开源词库只负责提供“词”，这里负责把“修饰词 + 中心词 + 动作 + 场景”
   // 从中文句子中组合成可用的 NAI 多词标签。不会凭空制造不存在的基础词。
