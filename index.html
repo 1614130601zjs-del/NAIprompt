@@ -104,6 +104,33 @@ function matchVocabulary(text){return allVocabulary().filter(e=>[e.canonical_tag
 function parse(text){
   const tags=[],add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};
   const conflicts=[];
+  if(!text)return "";
+
+  // 中文自然语言基础语义层：不要求用户必须使用词库里的英文标签。
+  const semanticMap=[
+    [/站着|站立|站在|站起/,"standing"],[/坐着|坐在|坐下/,"sitting"],
+    [/走着|走路|行走|漫步/,"walking"],[/跑着|跑步|奔跑/,"running"],
+    [/跪着|跪下|跪在/,"kneeling"],[/躺着|躺在|躺下/,"lying down"],
+    [/牵手|牵着手|手牵手/,"holding hands"],[/拥抱|抱住|抱着/,"hugging"],
+    [/看着对方|互相看|对视/,"looking at each other"],[/背对背/,"back to back"],
+    [/伸手|伸出手|伸手去/,"reaching out"],[/靠着|倚着|倚靠/,"leaning against"],
+    [/黑发|黑色头发/,"black hair"],[/白发|白色头发/,"white hair"],
+    [/金发|金色头发|金色长发/,"blonde hair"],[/银发|银色头发/,"silver hair"],
+    [/红眼|红色眼睛|红瞳/,"red eyes"],[/蓝眼|蓝色眼睛|蓝瞳/,"blue eyes"],
+    [/绿眼|绿色眼睛|绿瞳/,"green eyes"],[/长发|长头发/,"long hair"],[/短发|短头发/,"short hair"],
+    [/眼镜/,"glasses"],[/校服/,"school uniform"],[/黑西装/,"black suit"],[/黑大衣|黑色大衣/,"black coat"],[/白裙|白色连衣裙/,"white dress"],
+    [/雨中|下雨|雨天/,"rain"],[/雾气|雾中|大雾/,"fog"],[/霓虹|霓虹灯/,"neon lights"],
+    [/街灯|路灯/,"street lights"],[/黄昏|夕阳|日落/,"sunset"],[/清晨|日出/,"sunrise"],
+    [/逆光/,"backlighting"],[/柔光|柔和的光/,"soft lighting"],[/戏剧性光线|强烈光影/,"dramatic lighting"],
+    [/电影感|电影般|影视感|镜头感/,"cinematic composition"],[/景深/,"depth of field"],
+    [/特写|近景/,"close-up"],[/远景|广角远景/,"wide shot"],[/低机位|低角度/,"low angle"],[/高机位|高角度/,"high angle"],
+    [/负空间|留白/,"negative space"],[/偏构图|偏置构图/,"off-center composition"],
+    [/动态构图|动感构图/,"dynamic composition"],[/荷兰角|倾斜镜头/,"dutch angle"],
+    [/孤独|寂寥|空旷|疏离/,"negative space"],[/紧张|压迫感|冲突感|剑拔弩张/,"dramatic lighting"]
+  ];
+  semanticMap.forEach(([re,tag])=>{if(re.test(text))add(tag,1.08)});
+
+  const tagsBeforeVocabulary=tags.length;
   const hits=matchVocabulary(text);
   const matchedChars=chars.filter(c=>c.name&&text.includes(c.name));
   const genericPerson=/男生|男孩|男人|男性|女生|女孩|女人|女性|角色|人物/.test(text);
@@ -113,7 +140,7 @@ function parse(text){
     const positions=matchedChars.map(x=>text.indexOf(x.name));
     const pos=positions[index], next=positions.filter(p=>p>pos);
     const end=next.length?Math.min(...next):text.length;
-    return text.slice(Math.max(0,pos-24),Math.min(text.length,end+60));
+    return text.slice(Math.max(0,pos-60),Math.min(text.length,end+120));
   };
   const classifyScope=(scope)=>{
     const out={actions:[],poses:[],clothing:[],appearance:[]};
@@ -123,11 +150,15 @@ function parse(text){
       else if(e.category==="clothing")out.clothing.push(e.canonical_tag);
       else if(e.category==="appearance")out.appearance.push(e.canonical_tag);
     });
+    semanticMap.forEach(([re,tag])=>{if(re.test(scope)){
+      if(["standing","sitting","walking","running","holding hands","hugging","looking at each other","back to back","reaching out","leaning against","kneeling","lying down"].includes(tag))out.actions.push(tag);
+      else if(["black hair","white hair","blonde hair","silver hair","red eyes","blue eyes","green eyes","long hair","short hair","glasses"].includes(tag))out.appearance.push(tag);
+      else if(["school uniform","black suit","black coat","white dress"].includes(tag))out.clothing.push(tag);
+    }});
     return out;
   };
   const addScoped=(c,scope,index)=>{
     const base=appearanceFor(c);
-    // 锁定属性优先；未锁定属性允许被本次场景覆盖，但不会写回角色档案。
     const scoped=classifyScope(scope);
     const temporary=scoped.clothing.length||scoped.appearance.length;
     if(c.locked||!temporary)base.forEach((x,i)=>add(x,i<2?1.22:1.12));
@@ -139,7 +170,6 @@ function parse(text){
     scoped.actions.concat(scoped.poses).forEach(x=>add(x,1.14));
     const gender=/男生|男孩|男人|男性/.test(scope)?"1boy":/女生|女孩|女人|女性/.test(scope)?"1girl":null;
     if(gender)add(gender,1.04);
-
     if(scoped.actions.includes("standing")&&scoped.actions.includes("sitting"))conflicts.push(c.name+": standing / sitting");
     if(scoped.actions.includes("walking")&&scoped.actions.includes("running"))conflicts.push(c.name+": walking / running");
   };
@@ -154,6 +184,13 @@ function parse(text){
     else if(/男生|男孩|男人|男性/.test(text))add("1boy");
     if(/独自|一个人|单独|solo/.test(text))add("solo");
   }
+
+  // 已有英文 NAI 标签可直接作为输入，不再要求它必须存在于词库。
+  const englishTokens=text.match(/[A-Za-z][A-Za-z0-9_-]{2,}(?:\s+[A-Za-z][A-Za-z0-9_-]{2,})?/g)||[];
+  englishTokens.forEach(x=>{
+    const t=x.trim().toLowerCase();
+    if(!/^(the|and|with|this|that|girl|boy|woman|man|character|person|wearing|standing|sitting|looking|very|beautiful|scene)$/i.test(t))add(t,1);
+  });
 
   selected.forEach(t=>add(t,1.08));
   if(genericPerson&&!matchedChars.length&&!hits.some(e=>e.category==="appearance"))add("[APPEARANCE]");
