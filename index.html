@@ -585,7 +585,7 @@ function parse(text){
 
   // 手选标签
   selected.forEach(t=>add(t,1.08));
-  // 不再因为“男生/女生”本身强行添加外貌占位标签；只有实际识别到外貌信息时才输出外貌标签。
+  if(genericPerson&&!matchedChars.length&&!hits.some(e=>["appearance","hair","eyes","face"].includes(e.category))) add("[APPEARANCE]");
 
   // 意图修饰
   const effectiveIntent = intent!=="none" ? intent :
