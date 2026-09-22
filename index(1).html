@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NAI Prompt Compiler</title>
+<style>
+:root{
+  --bg:#f5f3ef;--card:#fff;--ink:#171717;--muted:#777;--line:#ddd7cf;
+  --accent:#b24b63;--soft:#f4dce2;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,-apple-system,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--card:#242424;--ink:#f0f0f0;--muted:#999;--line:#333;--soft:#3a2028}}
+main{max-width:1080px;margin:auto;padding:24px 16px 60px}
+.head{margin-bottom:16px}
+.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+.title{font-size:28px;font-weight:800;line-height:1.1}
+.sub{color:var(--muted);margin-top:6px;font-size:13px}
+.nav{display:flex;gap:8px;overflow-x:auto;margin:18px 0;padding-bottom:2px}
+.nav button{white-space:nowrap;flex-shrink:0}
+.nav button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.page{display:none}.page.active{display:block}
+.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 5px 20px #00000008}
+label{display:block;font-weight:700;margin-bottom:8px}
+textarea,input,select{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);padding:11px;font:inherit;outline:none}
+textarea{min-height:160px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:9px 13px;cursor:pointer;font:inherit}
+button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+button.danger{color:#a22;border-color:#ecc}
+.intent{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.intent button.active{background:var(--soft);border-color:#c88495}
+.prompt{min-height:140px;white-space:pre-wrap;background:#171717;color:#f5f5f5;border-radius:12px;padding:14px;font:13px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;background:#f3f0eb;border-radius:99px;padding:4px 8px;color:#333}
+.small{font-size:12px;color:var(--muted)}
+.hidden{display:none}
+.status{font-size:12px;color:var(--muted);margin-top:8px}
+.char-list,.save-list{display:grid;gap:8px}
+.char,.save-item{border:1px solid var(--line);border-radius:11px;padding:11px;background:var(--card)}
+.char b,.save-item b{display:block}
+.toolbar{display:grid;grid-template-columns:1fr 180px;gap:8px}
+/* 词库分类栏 */
+.catbar{margin:12px 0;display:flex;gap:8px;align-items:center}
+.cat-select{flex:1}
+.cat-select select{width:100%;padding:9px 11px}
+.cat-count{font-size:12px;color:var(--muted);white-space:nowrap}
+.vocab-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.vocab{border:1px solid var(--line);border-radius:11px;padding:11px;cursor:pointer;background:var(--card)}
+.vocab.selected{border-color:#c88495;background:#fff8fa}
+.vocab-top{display:flex;align-items:center;gap:8px}
+.vocab input[type=checkbox]{width:auto;flex-shrink:0}
+.tag{font-weight:700}
+.meta{font-size:11px;color:var(--muted);margin-top:4px}
+.alias{font-size:12px;color:#888;margin-top:5px}
+.save-layout{display:grid;grid-template-columns:320px 1fr;gap:16px}
+.save-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.save-tag{font-size:11px;background:#f3f0eb;border-radius:99px;padding:3px 7px}
+.save-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.import-box{border:1px dashed var(--line);border-radius:12px;padding:12px;margin-top:12px}
+.import-list{display:grid;gap:7px;margin-top:10px}
+.import-item{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--card)}
+.import-item b{font-size:13px}
+@media(max-width:760px){
+  .grid,.toolbar,.save-layout{grid-template-columns:1fr}
+  .title{font-size:22px}
+  .vocab-grid{grid-template-columns:1fr}
+  .intent{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<main>
+<header class="head">
+  <div class="eyebrow">NAI PROMPT COMPILER · V0.6</div>
+  <div class="title">自然语言 → NAI Prompt</div>
+  <div class="sub">离线运行 · 自然语言编译 · 角色管理 · 词库预览（含NSFW）· 提示词资料库</div>
+</header>
+<nav class="nav">
+  <button class="active" data-page="translatePage">① 自然语言转化</button>
+  <button data-page="characterPage">② 角色管理</button>
+  <button data-page="vocabPage">③ 词库预览</button>
+  <button data-page="importPage">④ 词库管理</button>
+  <button data-page="libraryPage">⑤ 提示词资料库</button>
+</nav>
+
+<!-- 页面①：翻译 -->
+<section id="translatePage" class="page active">
+  <div class="grid">
+    <div class="card">
+      <label for="input">自然语言描述</label>
+      <textarea id="input" placeholder="例如：黑发男生穿黑西装撑伞，白发女生穿白裙拿着花，两人在雨夜街道上对视，我想要有张力的电影感构图"></textarea>
+      <div class="row">
+        <button class="primary" id="translate">生成 Prompt</button>
+        <button id="clear">清空</button>
+        <button id="saveCurrent">保存到资料库</button>
+      </div>
+      <div style="margin-top:18px">
+        <label>视觉意图（可覆盖自动识别）</label>
+        <div class="intent">
+          <button data-intent="none" class="active">自然</button>
+          <button data-intent="tension">张力</button>
+          <button data-intent="cinematic">电影感</button>
+          <button data-intent="lonely">孤独感</button>
+        </div>
+      </div>
+      <div style="margin-top:18px">
+        <label>生成结果</label>
+        <div id="prompt" class="prompt">等待输入……</div>
+        <div class="row"><button id="copy">复制 Prompt</button></div>
+        <div id="status" class="status"></div>
+      </div>
+    </div>
+    <aside class="card">
+      <label>当前手选标签</label>
+      <div id="selectedTags" class="chips"><span class="small">暂无手动选择</span></div>
+      <div style="margin-top:18px">
+        <label>角色概览</label>
+        <div id="charMini" class="char-list"></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- 页面②：角色管理 -->
+<section id="characterPage" class="page">
+  <div class="card">
+    <label>角色管理器</label>
+    <div class="small">角色资料保存在当前浏览器。锁定属性不会被场景覆盖；场景中的临时服装、动作只作用于当前编译。</div>
+    <div id="chars" class="char-list" style="margin-top:12px"></div>
+    <div class="row"><button class="primary" id="newChar">＋ 新建角色</button></div>
+    <div id="editor" class="hidden" style="margin-top:14px">
+      <input id="cname" placeholder="角色名称">
+      <div class="row"><input id="cgender" placeholder="性别，例如：男"></div>
+      <div class="row"><input id="chair" placeholder="发色/发型，例如：黑色短发"></div>
+      <div class="row"><input id="ceye" placeholder="眼睛，例如：红色眼睛"></div>
+      <div class="row"><input id="ccloth" placeholder="固定服装（可留空）"></div>
+      <div class="row"><input id="cfeature" placeholder="其他特征（可留空）"></div>
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:0">
+          <input id="clock" type="checkbox" style="width:auto"> 锁定角色基础属性
+        </label>
+      </div>
+      <div class="row">
+        <button class="primary" id="saveChar">保存角色</button>
+        <button id="cancelChar">取消</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 页面③：词库预览 -->
+<section id="vocabPage" class="page">
+  <div class="card">
+    <label>NAI 词库预览</label>
+    <div class="small">浏览词库并手动选词，勾选后加入下一次编译结果。</div>
+    <div class="toolbar" style="margin-top:14px">
+      <input id="vsearch" placeholder="搜索英文标签或中文别名……">
+      <select id="vsource"><option value="all">全部来源</option><option value="local">内置词库</option><option value="custom">自定义</option></select>
+    </div>
+    <div class="catbar">
+      <div class="cat-select"><select id="categorySelect"></select></div>
+      <div id="catCount" class="cat-count"></div>
+    </div>
+    <div class="row">
+      <button id="clearSelected">清除已选</button>
+      <button class="primary" id="applySelected">应用到编译器</button>
+    </div>
+    <div id="vocabCount" class="status"></div>
+    <div id="vocabGrid" class="vocab-grid" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<!-- 页面④：词库管理 -->
+<section id="importPage" class="page">
+  <div class="card">
+    <label>词库管理</label>
+    <div class="small">可导入自定义 JSON 词库，保存在当前浏览器，不会覆盖内置词库。</div>
+    <div class="import-box">
+      <label for="vocabFile">导入词库</label>
+      <input id="vocabFile" type="file" accept=".json,.txt,.md">
+      <div class="small" style="margin-top:7px">支持 JSON / TXT / MD；TXT/MD 可一行一个词，或「英文标签 | 中文别名」格式。</div>
+      <div class="row">
+        <button class="primary" id="importVocab">导入</button>
+        <button id="exportVocab">导出我的词库</button>
+        <button class="danger" id="clearCustomVocab">清空我的词库</button>
+      </div>
+      <div id="importStatus" class="status"></div>
+    </div>
+    <div style="margin-top:16px">
+      <label>我的词库</label>
+      <div id="customVocabList" class="import-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 页面⑤：提示词资料库 -->
+<section id="libraryPage" class="page">
+  <div class="save-layout">
+    <div class="card">
+      <label>提示词资料库</label>
+      <div class="small">保存曾经生成的提示词，便于复用与搜索。</div>
+      <div style="margin-top:14px"><input id="saveTitle" placeholder="名称，例如：雨夜双人构图"></div>
+      <div style="margin-top:10px"><input id="saveTags" placeholder="画面标签，逗号分隔，例如：雨夜, 双人, 对视"></div>
+      <div style="margin-top:10px"><label>自然语言</label><textarea id="saveNatural" style="min-height:100px" placeholder="记录当时使用的中文描述……"></textarea></div>
+      <div style="margin-top:10px"><label>NAI Prompt</label><textarea id="saveNai" style="min-height:140px" placeholder="记录最终的 NAI 标签……"></textarea></div>
+      <div class="row">
+        <button class="primary" id="saveEntry">保存资料</button>
+        <button id="clearEntry">清空表单</button>
+      </div>
+      <div id="libraryStatus" class="status"></div>
+    </div>
+    <div class="card">
+      <label>已保存的提示词</label>
+      <div class="toolbar" style="margin-top:10px">
+        <input id="librarySearch" placeholder="搜索名称、标签、自然语言或 NAI 标签……">
+        <select id="libraryFilter"><option value="all">全部</option><option value="tag">按画面标签</option><option value="nai">按 NAI Prompt</option></select>
+      </div>
+      <div id="saveList" class="save-list" style="margin-top:12px"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+// ── 内置词库（已内嵌，离线可用）──────────────────────────
+const BUILT_IN_VOCAB = [{"canonical_tag": "black hair", "aliases": ["黑发", "黑色头发", "black_hair"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "white hair", "aliases": ["白发", "白色头发", "white_hair"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "blonde hair", "aliases": ["金发", "金色头发", "blonde_hair"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "silver hair", "aliases": ["银发", "银色头发", "silver_hair"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "red eyes", "aliases": ["红眼", "红色眼睛", "red_eyes"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "blue eyes", "aliases": ["蓝眼", "蓝色眼睛", "blue_eyes"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "green eyes", "aliases": ["绿眼", "绿色眼睛", "green_eyes"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "long hair", "aliases": ["长发", "long_hair"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "short hair", "aliases": ["短发", "short_hair"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "glasses", "aliases": ["眼镜", "戴眼镜"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "black suit", "aliases": ["黑色西装", "黑西装", "black_suit"], "category": "clothing", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "black coat", "aliases": ["黑色外套", "黑色风衣", "黑风衣", "black_coat"], "category": "clothing", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "white dress", "aliases": ["白色连衣裙", "白裙", "white_dress"], "category": "clothing", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "school uniform", "aliases": ["校服", "school_uniform"], "category": "clothing", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "standing", "aliases": ["站着", "站立", "站在"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sitting", "aliases": ["坐着", "坐在"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "walking", "aliases": ["走路", "行走", "正在走"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "running", "aliases": ["跑步", "奔跑", "正在跑"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "looking at viewer", "aliases": ["看向镜头", "看着镜头", "直视镜头"], "category": "pose", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "facing each other", "aliases": ["面对彼此", "面对面", "对峙", "互相面对"], "category": "pose", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "holding umbrella", "aliases": ["撑伞", "拿伞", "打伞"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "holding flower", "aliases": ["拿花", "手里拿着花", "捧花"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "cafe", "aliases": ["咖啡店", "咖啡馆"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "street", "aliases": ["街道", "街上", "街边"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "night", "aliases": ["夜晚", "晚上", "深夜"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "rain", "aliases": ["下雨", "雨天", "雨"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "snow", "aliases": ["雪", "下雪", "雪地"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "by window", "aliases": ["窗边", "靠窗"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "rooftop", "aliases": ["天台", "屋顶"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "ruins", "aliases": ["废墟"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "wide shot", "aliases": ["远景", "广角远景", "宽幅镜头"], "category": "camera", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "close-up", "aliases": ["特写", "近距离特写"], "category": "camera", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "low angle", "aliases": ["低机位", "仰拍", "低角度"], "category": "camera", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "high angle", "aliases": ["高机位", "俯拍", "高角度"], "category": "camera", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "dutch angle", "aliases": ["荷兰角", "倾斜镜头", "倾斜构图"], "category": "camera", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "dynamic composition", "aliases": ["动态构图", "动感构图"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "dramatic perspective", "aliases": ["戏剧性透视", "强烈透视"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "foreshortening", "aliases": ["缩短法", "强透视缩短"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "negative space", "aliases": ["留白", "负空间"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "off-center composition", "aliases": ["偏心构图", "主体偏置"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "depth of field", "aliases": ["景深", "浅景深"], "category": "camera", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "dramatic lighting", "aliases": ["戏剧性光照", "戏剧光影"], "category": "lighting", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "cinematic lighting", "aliases": ["电影感光照", "电影光影"], "category": "lighting", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "soft lighting", "aliases": ["柔和光线", "柔光"], "category": "lighting", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "backlighting", "aliases": ["逆光", "背光"], "category": "lighting", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "holding hands", "aliases": ["牵手", "握手", "手牵手"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "hugging", "aliases": ["拥抱", "抱住", "相拥"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "leaning against", "aliases": ["靠着", "倚靠", "倚着"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "looking at each other", "aliases": ["互相看着", "彼此注视", "相互注视"], "category": "pose", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "back to back", "aliases": ["背靠背", "背对背"], "category": "pose", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "kneeling", "aliases": ["跪着", "跪姿"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "lying down", "aliases": ["躺着", "躺下"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "reaching out", "aliases": ["伸手", "伸出手"], "category": "action", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "windblown hair", "aliases": ["被风吹起的头发", "风吹发丝"], "category": "appearance", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "wet clothes", "aliases": ["湿衣服", "衣服被雨水打湿"], "category": "clothing", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "street lights", "aliases": ["街灯", "路灯"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "neon lights", "aliases": ["霓虹灯", "霓虹"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "fog", "aliases": ["雾", "薄雾", "雾气"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sunset", "aliases": ["日落", "夕阳", "黄昏"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sunrise", "aliases": ["日出", "朝霞", "清晨阳光"], "category": "environment", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "rim lighting", "aliases": ["轮廓光", "边缘光"], "category": "lighting", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "volumetric lighting", "aliases": ["体积光", "光束"], "category": "lighting", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "cinematic composition", "aliases": ["电影感构图", "电影式构图"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "centered composition", "aliases": ["居中构图", "中心构图"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "symmetrical composition", "aliases": ["对称构图"], "category": "composition", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "three-piece suit", "aliases": ["三件套西装"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "double-breasted", "aliases": ["双排扣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "single-breasted", "aliases": ["单排扣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tailcoat", "aliases": ["燕尾服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "morning coat", "aliases": ["晨礼服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "frock coat", "aliases": ["双排扣长礼服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tuxedo", "aliases": ["塔克西多/无尾礼服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "zoot suit", "aliases": ["阻特装"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bolero jacket", "aliases": ["短身罩衫/波莱罗"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mess jacket", "aliases": ["晚宴短夹克"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "spencer jacket", "aliases": ["斯宾塞短外套"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chesterfield coat", "aliases": ["切斯特菲尔德大衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ulster coat", "aliases": ["阿尔斯特大衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "inverness coat", "aliases": ["因弗内斯斗篷大衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "smoking jacket", "aliases": ["吸烟装"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "peaked lapels", "aliases": ["枪驳领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "notch lapels", "aliases": ["平驳领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "shawl collar", "aliases": ["青果领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mandarin collar", "aliases": ["立领/中山领", "立领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "high collar", "aliases": ["高领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "popped collar", "aliases": ["竖起的衣领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "epaulettes", "aliases": ["肩章"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "aiguillette", "aliases": ["饰绪"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "waistcoat", "aliases": ["西装马甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gilet", "aliases": ["装饰背心"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cummerbund", "aliases": ["腰封"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "jabot", "aliases": ["领饰/胸饰", "领饰"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cravat", "aliases": ["领巾"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ascot", "aliases": ["阿斯科特领巾"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "suspenders", "aliases": ["背带"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pauldron", "aliases": ["护肩"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "spaulders", "aliases": ["轻型护肩"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gorget", "aliases": ["护颈甲", "护颈"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cuirass", "aliases": ["胸甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "breastplate", "aliases": ["前胸甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "plackart", "aliases": ["腹甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "faulds", "aliases": ["裙甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tasset", "aliases": ["腿甲挂片", "挂甲/裙甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gauntlets", "aliases": ["铁手套"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vambraces", "aliases": ["臂甲", "护臂"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "rerebrance", "aliases": ["上臂甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "couter", "aliases": ["肘甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "greaves", "aliases": ["护胫甲", "护胫"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sabatons", "aliases": ["铁靴"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "poleyn", "aliases": ["膝甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mail coif", "aliases": ["锁甲头巾"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "lamellar armor", "aliases": ["札甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "scale mail", "aliases": ["鳞甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chainmail", "aliases": ["锁子甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "brigandine", "aliases": ["布面甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gambeson", "aliases": ["软铠甲/棉甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "segmented armor", "aliases": ["节段甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fluted armor", "aliases": ["棱纹甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "surcoat", "aliases": ["战袍/罩袍", "罩袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tabard", "aliases": ["纹章袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cowl", "aliases": ["蒙头斗篷"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "himation", "aliases": ["希玛纯长袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chiton", "aliases": ["希顿束腰衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "stole", "aliases": ["圣带"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chasuble", "aliases": ["祭披"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mantle", "aliases": ["斗篷/短披风"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vambrace (leather)", "aliases": ["皮护臂"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "quiver", "aliases": ["箭袋"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bandolier", "aliases": ["斜挎子弹带/药剂带"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "plugsuit", "aliases": ["插入式驾驶服", "驾驶员服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vacuum suit / VAC suit", "aliases": ["真空服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "power armor", "aliases": ["动力装甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "exoskeleton", "aliases": ["外骨骼"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "techwear", "aliases": ["机能风"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hard suit", "aliases": ["硬式防护服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "nanosuit", "aliases": ["纳米服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "flight suit", "aliases": ["飞行服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mechanical parts", "aliases": ["机械零件"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "joints", "aliases": ["机械关节"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cybernetic arm", "aliases": ["义肢（臂）"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "prosthetic leg", "aliases": ["义肢（腿）"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ocular implant", "aliases": ["视觉植入物"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "interface headset", "aliases": ["接口头戴设备"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "spinal implant", "aliases": ["脊柱植入物"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cables / wires", "aliases": ["线缆"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vents", "aliases": ["通气口/散热口"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "thrusters", "aliases": ["推进器"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "glowing trim", "aliases": ["发光滚边"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "holographic interface", "aliases": ["全息界面"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "circuit pattern", "aliases": ["电路板纹理"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "panel lines", "aliases": ["刻线"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "carbon fiber", "aliases": ["碳纤维"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "latex", "aliases": ["乳胶"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chrome", "aliases": ["镀铬"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "plastic", "aliases": ["塑料"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "iridescent", "aliases": ["彩虹色/由于干涉", "彩虹色/干涉光"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "translucent", "aliases": ["半透明"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "furisode", "aliases": ["振袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "uchikake", "aliases": ["打挂"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "shiromuku", "aliases": ["白无垢"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hakama", "aliases": ["袴"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "haori", "aliases": ["羽织"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tasuki", "aliases": ["襷"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sarashi", "aliases": ["裹胸布"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "happi", "aliases": ["法披"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "junihitoe", "aliases": ["十二单"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fox mask (kitsune)", "aliases": ["狐面"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tengu geta", "aliases": ["单齿木屐"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "corset", "aliases": ["束腰"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crinoline", "aliases": ["鸟笼裙撑"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bustle", "aliases": ["巴瑟尔裙撑"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "petticoat", "aliases": ["衬裙", "裙撑/衬裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bloomers", "aliases": ["灯笼裤/南瓜裤"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bonnet", "aliases": ["软帽/波浪帽", "软帽/博内特帽"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ruffle collar", "aliases": ["拉夫领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cameo", "aliases": ["浮雕宝石"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "parasol", "aliases": ["阳伞"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "toga", "aliases": ["托加", "托加长袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "stola", "aliases": ["斯托拉"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dirndl", "aliases": ["迪恩德尔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "kilt", "aliases": ["苏格兰裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sari", "aliases": ["纱丽"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "caftan", "aliases": ["卡夫坦长袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "poncho", "aliases": ["斗篷/披风"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "plunging neckline", "aliases": ["深V领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "halterneck", "aliases": ["挂脖领", "挂脖式"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sweetheart neckline", "aliases": ["心形领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "keyhole cutout", "aliases": ["钥匙孔镂空"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "off-shoulder", "aliases": ["一字肩/露肩", "一字肩"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cold shoulder", "aliases": ["挖肩袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "backless", "aliases": ["露背"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "turtleneck", "aliases": ["高领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cowl neck", "aliases": ["堆领"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "puff sleeves", "aliases": ["泡泡袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bell sleeves", "aliases": ["喇叭袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bishop sleeves", "aliases": ["主教袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "juliet sleeves", "aliases": ["朱丽叶袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "detached sleeves", "aliases": ["分离式袖子"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "leg-of-mutton sleeves", "aliases": ["羊腿袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pencil skirt", "aliases": ["铅笔裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "a-line skirt", "aliases": ["A字裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mermaid skirt", "aliases": ["鱼尾裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tiered skirt", "aliases": ["蛋糕裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "high-low skirt", "aliases": ["前短后长裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "slit skirt", "aliases": ["开叉裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "harem pants", "aliases": ["哈伦裤"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "palazzo pants", "aliases": ["阔腿裤"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "capri pants", "aliases": ["七分裤"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "raglan sleeves", "aliases": ["插肩袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dolman sleeves", "aliases": ["蝙蝠袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "spaghetti strap", "aliases": ["细吊带"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "racerback", "aliases": ["工字背"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crop top", "aliases": ["露脐上衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "midriff", "aliases": ["露腰装"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "asymmetrical", "aliases": ["不对称剪裁"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gothic lolita", "aliases": ["哥特洛丽塔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sweet lolita", "aliases": ["甜系洛丽塔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "classic lolita", "aliases": ["古典洛丽塔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wa lolita", "aliases": ["和风洛丽塔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "qi lolita", "aliases": ["中华风洛丽塔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sailor lolita", "aliases": ["水手洛丽塔"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "headdress", "aliases": ["扁平头饰"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "frills", "aliases": ["褶边"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ruffles", "aliases": ["荷叶边"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bows", "aliases": ["蝴蝶结"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pinafore dress", "aliases": ["围裙裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "oversized", "aliases": ["超大码"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hoodie down", "aliases": ["兜帽放下"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hood up", "aliases": ["戴上兜帽"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sukajan", "aliases": ["横须贺夹克"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "varsity jacket", "aliases": ["棒球服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "coach jacket", "aliases": ["教练夹克"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "track suit", "aliases": ["运动套装"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cargo pants", "aliases": ["工装裤"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "harness", "aliases": ["束带"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "buckle", "aliases": ["插扣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "straps", "aliases": ["飘带/带子"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fishnet top", "aliases": ["渔网衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "kimono", "aliases": ["和服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tomesode", "aliases": ["留袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "yukata", "aliases": ["浴衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fundoshi", "aliases": ["褌"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tabi", "aliases": ["足袋"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "obi", "aliases": ["腰带", "和服腰带"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hanfu", "aliases": ["汉服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "qipao / cheongsam", "aliases": ["旗袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tangzhuang", "aliases": ["唐装"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "china dress", "aliases": ["中华风连衣裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bun covers", "aliases": ["包子头套"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tassel", "aliases": ["流苏"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wide sleeves", "aliases": ["宽袖/大袖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chemise", "aliases": ["衬裙"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "capelet", "aliases": ["小披肩"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tunic", "aliases": ["束腰外衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wizard hat", "aliases": ["巫师帽"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "witch hat", "aliases": ["女巫帽"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hooded robe", "aliases": ["连帽长袍"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "habit", "aliases": ["修女/修士服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "veil", "aliases": ["头纱/面纱"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "grimoire", "aliases": ["魔法书"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "orb", "aliases": ["法球"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "staff", "aliases": ["法杖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wand", "aliases": ["魔杖"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "leather armor", "aliases": ["皮甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hood", "aliases": ["兜帽"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mask", "aliases": ["面罩", "面具/口罩"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cape", "aliases": ["披风"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "thigh holster", "aliases": ["大腿枪套/刀套"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dagger", "aliases": ["匕首"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dual wielding", "aliases": ["双持"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "plate armor", "aliases": ["板甲"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bodysuit", "aliases": ["紧身衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "leotard", "aliases": ["连体衣"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vacuum suit", "aliases": ["真空服/宇航服"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "augmented reality", "aliases": ["增强现实"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hologram", "aliases": ["全息投影"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pvc", "aliases": ["PVC材质"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "metallic", "aliases": ["金属质感"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bioluminescent", "aliases": ["生物发光"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "glowing", "aliases": ["发光"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "neon trim", "aliases": ["霓虹滚边"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "circuit board", "aliases": ["电路板纹理"], "category": "clothing", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair ribbon", "aliases": ["发带"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair bow", "aliases": ["蝴蝶结"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "scrunchie", "aliases": ["大肠发圈"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hairclip", "aliases": ["发夹"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hairpin", "aliases": ["发簪"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair flower", "aliases": ["头花"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair ornament", "aliases": ["发饰"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "alice band", "aliases": ["爱丽丝发箍"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tiara", "aliases": ["小皇冠"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crown", "aliases": ["皇冠"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "halo", "aliases": ["光环"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "horns", "aliases": ["角"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "headphones", "aliases": ["头戴式耳机", "耳机"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "animal ears", "aliases": ["兽耳"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "rimless glasses", "aliases": ["无框眼镜"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sunglasses", "aliases": ["墨镜"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "goggles", "aliases": ["护目镜"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "eyepatch", "aliases": ["眼罩"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gas mask", "aliases": ["防毒面具"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fox mask", "aliases": ["狐面"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "blindfold", "aliases": ["蒙眼布"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "piercing", "aliases": ["穿环"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "earrings", "aliases": ["耳环"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "choker", "aliases": ["颈圈"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "collar", "aliases": ["项圈"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "necklace", "aliases": ["项链"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "scarf", "aliases": ["围巾"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tie / necktie", "aliases": ["领带"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bowtie", "aliases": ["领结"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ribbon", "aliases": ["丝带"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "belt", "aliases": ["腰带"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sash", "aliases": ["腰带/饰带"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gloves", "aliases": ["手套"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fingerless gloves", "aliases": ["露指手套"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "elbow gloves", "aliases": ["长手套"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bridal gauntlets", "aliases": ["婚纱手套"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "arm warmers", "aliases": ["手臂套"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wristband", "aliases": ["护腕"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bracelets", "aliases": ["手镯"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "rings", "aliases": ["戒指"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "garters", "aliases": ["吊袜带"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "leg warmers", "aliases": ["腿套"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "anklet", "aliases": ["脚链"], "category": "accessories", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sneakers", "aliases": ["运动鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "high tops", "aliases": ["高帮鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "boots", "aliases": ["靴子"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ankle boots", "aliases": ["短靴"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "knee boots", "aliases": ["及膝靴"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "thigh boots", "aliases": ["过膝靴"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "combat boots", "aliases": ["战斗靴/马丁靴"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "armored boots", "aliases": ["铠甲靴"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "loafers", "aliases": ["乐福鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mary janes", "aliases": ["玛丽珍鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pumps", "aliases": ["船鞋/高跟鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "stilettos", "aliases": ["细高跟"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "platforms", "aliases": ["厚底鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sandals", "aliases": ["凉鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gladiator sandals", "aliases": ["罗马凉鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "geta", "aliases": ["木屐"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "zori", "aliases": ["草履"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "slippers", "aliases": ["拖鞋"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "barefoot", "aliases": ["赤脚"], "category": "footwear", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "slicked back", "aliases": ["全背头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pompadour", "aliases": ["庞帕多/飞机头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "quiff", "aliases": ["奎夫头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "psychobilly wedge", "aliases": ["楔形庞帕多"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ducktail", "aliases": ["鸭尾头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "side part", "aliases": ["侧分油头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hard part", "aliases": ["刻痕侧分"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "comb over", "aliases": ["侧梳/借盖"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "curtains", "aliases": ["中分窗帘头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "undercut", "aliases": ["底层修剪/铲青"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fade", "aliases": ["渐变剪"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "low fade", "aliases": ["低渐变"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "high fade", "aliases": ["高渐变"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "skin fade", "aliases": ["皮肤渐变"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "taper fade", "aliases": ["锥形渐变"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crew cut", "aliases": ["锅盖头/平头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "buzz cut", "aliases": ["寸头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ivy league", "aliases": ["常春藤头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "caesar cut", "aliases": ["凯撒头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "french crop", "aliases": ["法式短寸"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "man bun", "aliases": ["男士丸子头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "top knot", "aliases": ["武士头/顶髻"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "samurai topknot", "aliases": ["丁髷 (Chonmage)"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dreadlocks", "aliases": ["脏辫"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cornrows", "aliases": ["贴头皮辫"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mullet", "aliases": ["鲻鱼头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wolf cut", "aliases": ["狼尾", "狼尾发型"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pixie cut", "aliases": ["精灵短发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bob cut", "aliases": ["波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "a-line bob", "aliases": ["A字波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "inverted bob", "aliases": ["倒扣波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "french bob", "aliases": ["法式波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "shag cut", "aliases": ["鲻鱼碎发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hime cut (short)", "aliases": ["短姬发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bowl cut", "aliases": ["蘑菇头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "garcon style", "aliases": ["假小子头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "layered bob", "aliases": ["层次波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "blunt bob", "aliases": ["一刀切波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "asymmetrical bob", "aliases": ["不对称波波头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "monolid", "aliases": ["单眼皮"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "double eyelid", "aliases": ["双眼皮"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hooded eyes", "aliases": ["内双/遮盖眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "deep-set eyes", "aliases": ["深眼窝"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "protruding eyes", "aliases": ["凸眼/金鱼眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "almond eyes", "aliases": ["杏仁眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "downturned eyes", "aliases": ["drooping/下垂眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "upturned eyes", "aliases": ["上挑眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wide-set eyes", "aliases": ["眼距宽"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "close-set eyes", "aliases": ["眼距窄"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "epicanthic fold", "aliases": ["内眦赘皮"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tear trough", "aliases": ["泪沟"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "limbal ring", "aliases": ["角膜缘环"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "small iris", "aliases": ["小虹膜"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "large iris", "aliases": ["大虹膜"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sectoral heterochromia", "aliases": ["扇形异色"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "central heterochromia", "aliases": ["中心异色"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "clumpy lashes", "aliases": ["簇状睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wispy lashes", "aliases": ["纤细睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "straight lashes", "aliases": ["直睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cupid's bow", "aliases": ["唇峰/丘比特之弓"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "thin lips", "aliases": ["薄唇"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "full lips", "aliases": ["丰唇"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bottom-heavy lips", "aliases": ["下唇厚"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "top-heavy lips", "aliases": ["上唇厚"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "flat philtrum", "aliases": ["人中平坦"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "deep philtrum", "aliases": ["人中深"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "downturned mouth", "aliases": ["覆舟嘴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "upturned mouth", "aliases": ["微笑唇"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chapped lips", "aliases": ["干裂嘴唇"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "glossy lips", "aliases": ["唇蜜质感"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bitten lips", "aliases": ["咬唇妆/被咬过的嘴唇"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hyper-realistic skin", "aliases": ["超写实皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "skin pores", "aliases": ["毛孔"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "subsurface scattering", "aliases": ["次表面散射"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "goosebumps", "aliases": ["鸡皮疙瘩"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vellus hair", "aliases": ["毳毛/汗毛"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "oily skin", "aliases": ["油性皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dry skin", "aliases": ["干性皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "freckles", "aliases": ["雀斑"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cluster of freckles", "aliases": ["成片雀斑"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "acne", "aliases": ["痤疮/痘痘"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "acne scars", "aliases": ["痘坑/痘印"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "rosacea", "aliases": ["酒渣鼻/面部泛红"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "vitiligo", "aliases": ["白癜风"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "birthmark", "aliases": ["胎记"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sunburn", "aliases": ["晒伤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "stretch marks", "aliases": ["妊娠纹/生长纹"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cellulite", "aliases": ["橘皮组织"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crows feet", "aliases": ["鱼尾纹"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "laugh lines", "aliases": ["笑纹/法令纹"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "forehead lines", "aliases": ["抬头纹"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "frown lines", "aliases": ["川字纹"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "liver spots", "aliases": ["老年斑"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "saggy skin", "aliases": ["皮肤松弛"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "high cheekbones", "aliases": ["高颧骨"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sunken cheeks", "aliases": ["脸颊凹陷", "凹陷脸颊"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chiseled jaw", "aliases": ["雕刻般的下颚"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "soft jawline", "aliases": ["柔和下颚"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cleft chin", "aliases": ["屁股下巴/美人沟", "屁股下巴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "receding chin", "aliases": ["下巴后缩"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "prognathism", "aliases": ["下巴前突/地包天"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "roman nose", "aliases": ["罗马鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "aquiline nose", "aliases": ["鹰钩鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "grecian nose", "aliases": ["希腊鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bulbous nose", "aliases": ["蒜头鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "upturned nose", "aliases": ["翘鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tsurime", "aliases": ["吊眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tareme", "aliases": ["下垂眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "jitome", "aliases": ["半眯眼/鄙视眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sanpaku", "aliases": ["三白眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "slanted eyes", "aliases": ["斜眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "round eyes", "aliases": ["圆眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "narrow eyes", "aliases": ["眯眯眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "drooping eyes", "aliases": ["睡眼/颓废眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sharp eyes", "aliases": ["锐利眼神"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "empty eyes", "aliases": ["空洞眼神"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "solid eyes", "aliases": ["纯色眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "slit pupils", "aliases": ["竖瞳"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "horizontal pupils", "aliases": ["横瞳"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "rectangular pupils", "aliases": ["长方形瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "flower-shaped pupils", "aliases": ["花形瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "heart-shaped pupils", "aliases": ["心形瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "star-shaped pupils", "aliases": ["星形瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "diamond-shaped pupils", "aliases": ["菱形瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cross-shaped pupils", "aliases": ["十字瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mismatched pupils", "aliases": ["瞳孔形状不一"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "heterochromia", "aliases": ["异色瞳"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gradient eyes", "aliases": ["渐变色眼睛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "multicolored eyes", "aliases": ["多彩眼睛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "glowing eyes", "aliases": ["发光眼睛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "constricted pupils", "aliases": ["瞳孔收缩"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dilated pupils", "aliases": ["瞳孔扩散"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "no pupils", "aliases": ["无瞳孔"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ringed eyes", "aliases": ["轮回眼/圈圈眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "long eyelashes", "aliases": ["长睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "thick eyelashes", "aliases": ["浓密睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "colored eyelashes", "aliases": ["彩色睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "white eyelashes", "aliases": ["白睫毛"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "eyeshadow", "aliases": ["眼影"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "eyeliner", "aliases": ["眼线"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bags under eyes", "aliases": ["眼袋/黑眼圈"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tears", "aliases": ["眼泪"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crying with eyes open", "aliases": ["睁眼流泪"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "moist eyes", "aliases": ["湿润眼眶"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "covered eyes", "aliases": ["遮眼"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair over one eye", "aliases": ["单眼遮盖"], "category": "eyes", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "blunt bangs", "aliases": ["齐刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hime cut", "aliases": ["姬发式"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "swept bangs", "aliases": ["斜刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "parted bangs", "aliases": ["中分/偏分刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair between eyes", "aliases": ["眼间发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crossed bangs", "aliases": ["交叉刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "asymmetrical bangs", "aliases": ["不对称刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "long bangs", "aliases": ["长刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "forehead", "aliases": ["露额头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "drill bangs", "aliases": ["钻头刘海"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hair intakes", "aliases": ["进气口发型"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "short hair with long locks", "aliases": ["短发长鬓角"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ponytail", "aliases": ["马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "high ponytail", "aliases": ["高马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "low ponytail", "aliases": ["低马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "side ponytail", "aliases": ["侧马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "twintails", "aliases": ["双马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "low twintails", "aliases": ["低双马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tri-tails", "aliases": ["三马尾"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "braid", "aliases": ["麻花辫"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "twin braids", "aliases": ["双麻花辫"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "french braid", "aliases": ["法式编发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "crown braid", "aliases": ["盘头编发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bun", "aliases": ["丸子头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "double bun", "aliases": ["双丸子头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "braided bun", "aliases": ["编织盘发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "half updo", "aliases": ["半扎发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "okappa", "aliases": ["娃娃头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "straight hair", "aliases": ["直发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "curly hair", "aliases": ["卷发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wavy hair", "aliases": ["波浪发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ringlets", "aliases": ["螺旋卷"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "spiked hair", "aliases": ["刺猬头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "messy hair", "aliases": ["凌乱发型"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "bedhead", "aliases": ["炸毛/寝癖"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ahoge", "aliases": ["呆毛"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "heart ahoge", "aliases": ["心形呆毛"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "antenna hair", "aliases": ["蟑螂须"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "floating hair", "aliases": ["漂浮头发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wind blown hair", "aliases": ["风吹发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wet hair", "aliases": ["湿发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "shiny hair", "aliases": ["光泽发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "two-tone hair", "aliases": ["双色发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "streaked hair", "aliases": ["挑染"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gradient hair", "aliases": ["渐变发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "split-color hair", "aliases": ["阴阳头"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "inner color hair", "aliases": ["挂耳染/内层染"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "multicolored hair", "aliases": ["多彩发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "translucent hair", "aliases": ["半透明头发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "glowing hair", "aliases": ["发光头发"], "category": "hair", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "round face", "aliases": ["圆脸"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "oval face", "aliases": ["鹅蛋脸"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "square face", "aliases": ["方脸"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sharp jawline", "aliases": ["锋利下颚线"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pointed chin", "aliases": ["尖下巴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "chubby face", "aliases": ["婴儿肥/肉脸"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wide face", "aliases": ["宽脸"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pointed nose", "aliases": ["尖鼻子"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "button nose", "aliases": ["蒜头鼻/小圆鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "flat nose", "aliases": ["塌鼻子"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "hook nose", "aliases": ["鹰钩鼻"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "realistic nose", "aliases": ["写实鼻子"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "nose blush", "aliases": ["鼻头红晕"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pale skin", "aliases": ["苍白皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fair skin", "aliases": ["白皙皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tan", "aliases": ["晒黑"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dark skin", "aliases": ["黑皮"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "blue skin", "aliases": ["蓝皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "green skin", "aliases": ["绿皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "grey skin", "aliases": ["灰皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "oiled skin", "aliases": ["油亮皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sweaty skin", "aliases": ["流汗皮肤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "glossy skin", "aliases": ["光泽肌"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "beauty mark", "aliases": ["美人痣"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mole under eye", "aliases": ["泪痣"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mole on neck", "aliases": ["颈部痣"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "scars", "aliases": ["伤疤"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "scar across eye", "aliases": ["刀疤眼"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "burn scar", "aliases": ["烧伤疤痕"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "stitched face", "aliases": ["缝合脸"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wrinkles", "aliases": ["皱纹"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "forehead mark", "aliases": ["额头印记"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "facial tattoo", "aliases": ["面部纹身"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "barcode", "aliases": ["条形码"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "blush stickers", "aliases": ["脸红线"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "parted lips", "aliases": ["微微张嘴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pout", "aliases": ["嘟嘴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "triangle mouth", "aliases": ["三角嘴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wavy mouth", "aliases": ["波浪嘴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "dot mouth", "aliases": ["点状嘴"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "lipstick", "aliases": ["口红"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "heavy breathing", "aliases": ["喘息"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "drooling", "aliases": ["流口水"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "makeup smudge", "aliases": ["口红晕开"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fangs", "aliases": ["尖牙"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "canine teeth", "aliases": ["犬齿"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "shark teeth", "aliases": ["鲨鱼牙"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "serrated teeth", "aliases": ["锯齿牙"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "gold tooth", "aliases": ["金牙"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "braces", "aliases": ["牙套"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tongue out", "aliases": ["吐舌"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "split tongue", "aliases": ["分叉舌"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "long tongue", "aliases": ["长舌头"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "tongue piercing", "aliases": ["舌钉"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "pointed ears", "aliases": ["尖耳朵"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "long pointed ears", "aliases": ["长尖耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "floppy ears", "aliases": ["垂耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "cat ears", "aliases": ["猫耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "wolf ears", "aliases": ["狼耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "fox ears", "aliases": ["狐狸耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "rabbit ears", "aliases": ["兔耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "elf ears", "aliases": ["精灵耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "demon horns", "aliases": ["恶魔角"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "oni horns", "aliases": ["鬼角"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "antlers", "aliases": ["鹿角"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "ram horns", "aliases": ["盘羊角"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "curved horns", "aliases": ["弯角"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mechanical ears", "aliases": ["机械耳"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "beard", "aliases": ["胡子"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mustache", "aliases": ["髭"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "goatee", "aliases": ["山羊胡"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "stubble", "aliases": ["胡茬"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "sideburns", "aliases": ["鬓角"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "mutton chops", "aliases": ["羊排胡"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "braided beard", "aliases": ["编织胡子"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "white beard", "aliases": ["白胡子"], "category": "face", "related": [], "conflicts": [], "source": "Novelai4.5词库.md"}, {"canonical_tag": "panties", "aliases": ["内裤", "内裤_通用"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "striped panties", "aliases": ["条纹内裤", "shimapan", "蓝白条纹内裤"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "side-tie panties", "aliases": ["侧系带内裤", "蝴蝶结内裤", "side_tie_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "string panties", "aliases": ["细带内裤", "string_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "thong", "aliases": ["丁字裤", "thong_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "g-string", "aliases": ["G弦裤", "g_string"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "tanga", "aliases": ["坦加内裤", "tanga_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "boyshorts", "aliases": ["平角内裤", "boy_shorts", "运动内裤"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bloomers", "aliases": ["灯笼裤", "南瓜裤", "bloomers_underwear"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "high-leg panties", "aliases": ["高叉内裤", "high_leg_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "frilled panties", "aliases": ["荷叶边内裤", "frilled_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "lace panties", "aliases": ["蕾丝内裤", "lace_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "satin panties", "aliases": ["缎面内裤", "satin_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "crotchless panties", "aliases": ["开档内裤", "crotchless_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "c-string", "aliases": ["C字裤", "c_string"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "low-rise panties", "aliases": ["低腰内裤", "low_rise_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "micro panties", "aliases": ["极小内裤", "micro_panties"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "fundoshi", "aliases": ["褌", "兜裆布", "fundoshi_female"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bra", "aliases": ["文胸", "胸罩", "内衣上装"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sports bra", "aliases": ["运动内衣", "sports_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "lace bra", "aliases": ["蕾丝文胸", "lace_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "strapless bra", "aliases": ["无肩带文胸", "strapless_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "shelf bra", "aliases": ["托胸文胸", "shelf_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "open bra", "aliases": ["开胸文胸", "open_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "quarter cup bra", "aliases": ["1/4罩杯文胸", "quarter_cup_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "micro bra", "aliases": ["极小文胸", "micro_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "pasties", "aliases": ["乳贴", "nipple stickers", "pasties_nipple"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "nursing bra", "aliases": ["哺乳文胸", "nursing_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sarashi", "aliases": ["裹胸布", "sarashi_chest"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bandeau", "aliases": ["抹胸", "bandeau_top"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "tube top", "aliases": ["裹胸上衣", "tube_top"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "harness bra", "aliases": ["束带文胸", "harness_bra"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "teddy", "aliases": ["特迪内衣", "连体情趣内衣", "teddy_lingerie"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "babydoll", "aliases": ["娃娃裙睡衣", "baby_doll"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "chemise", "aliases": ["吊带睡裙", "chemise_nightwear"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "negligee", "aliases": ["薄纱睡袍", "negligee_nightwear"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "school swimsuit", "aliases": ["死库水", "school_swimsuit", "スクール水着"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "competition swimsuit", "aliases": ["竞速泳装", "competition_swimsuit"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "slingshot swimsuit", "aliases": ["弹弓泳装", "slingshot_swimsuit"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "micro bikini", "aliases": ["极小比基尼", "micro_bikini"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sling bikini", "aliases": ["吊带比基尼", "sling_bikini"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "latex suit", "aliases": ["乳胶衣", "latex_suit", "全身乳胶"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "catsuit", "aliases": ["紧身连体裤", "catsuit"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "fishnet bodysuit", "aliases": ["渔网连体衣", "fishnet_bodysuit"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "reverse bunnysuit", "aliases": ["反穿兔女郎装", "reverse_bunnysuit"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "apron only", "aliases": ["裸体围裙", "naked apron", "apron_only"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "ribbon bond", "aliases": ["丝带缠绕", "ribbon_only", "只用丝带遮盖"], "category": "nsfw_lingerie", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "boxers", "aliases": ["宽松四角裤", "boxer_shorts"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "briefs", "aliases": ["三角裤", "男士三角裤", "briefs_underwear"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "boxer briefs", "aliases": ["紧身四角裤", "boxer_briefs"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "low-rise underwear", "aliases": ["低腰内裤男", "low_rise_underwear"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "white briefs", "aliases": ["白三角", "white_briefs"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "black briefs", "aliases": ["黑三角", "black_briefs"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "loincloth", "aliases": ["缠腰布", "loincloth_primitive"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "thong (male)", "aliases": ["男士丁字裤", "male_thong"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "jockstrap", "aliases": ["后空内裤", "护身三角", "jockstrap"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "g-string (male)", "aliases": ["男士G弦裤", "male_g_string"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bulge", "aliases": ["裆部隆起", "bulge"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "large bulge", "aliases": ["巨大隆起", "large_bulge"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "erection under clothes", "aliases": ["衣服下的勃起", "erection_under_clothes"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "shirt lift", "aliases": ["掀起衬衫", "shirt_lift", "掀衣露腹"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "towel around waist", "aliases": ["腰间围浴巾", "towel_around_waist"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "harness (male)", "aliases": ["男士束带", "male_harness"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "latex shorts", "aliases": ["乳胶短裤", "latex_shorts"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "biker shorts", "aliases": ["骑行裤", "biker_shorts"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "wrestling singlet", "aliases": ["摔跤服", "wrestling_singlet"], "category": "nsfw_male", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "stockings", "aliases": ["长筒袜", "stockings_legwear"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "thighhighs", "aliases": ["大腿袜", "过膝袜", "thigh_highs"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "pantyhose", "aliases": ["连裤袜", "pantyhose"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bodystocking", "aliases": ["全身丝袜", "body_stocking"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "fishnets", "aliases": ["渔网袜", "fishnet_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "seamed legwear", "aliases": ["接缝丝袜", "seamed_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "garter belt", "aliases": ["吊袜带", "garter_belt"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "suspender belt", "aliases": ["吊带", "suspender_belt"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "torn pantyhose", "aliases": ["破损连裤袜", "torn_pantyhose", "破裤袜"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "laddered pantyhose", "aliases": ["抽丝连裤袜", "laddered_pantyhose"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "sheer legwear", "aliases": ["薄透丝袜", "sheer_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "opaque legwear", "aliases": ["不透丝袜", "opaque_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "toeless legwear", "aliases": ["露趾丝袜", "toeless_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "stirrup legwear", "aliases": ["踩脚袜", "stirrup_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "lace-trimmed legwear", "aliases": ["蕾丝边丝袜", "lace_top_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "striped thighhighs", "aliases": ["条纹大腿袜", "striped_thighhighs"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "latex stockings", "aliases": ["乳胶长袜", "latex_stockings"], "category": "nsfw_legwear", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bondage", "aliases": ["束缚", "被绑住", "bondage_state"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "rope", "aliases": ["绳索", "绑绳", "rope_bondage"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "shibari", "aliases": ["龟甲缚", "日式绑缚", "shibari_bondage"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "handcuffs", "aliases": ["手铐", "handcuffs"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "shackles", "aliases": ["镣铐", "铁链枷锁", "shackles"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "wooden horse", "aliases": ["木马刑具", "wooden_horse"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "pillory", "aliases": ["枷锁", "pillory"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "chains", "aliases": ["铁链", "chains_bondage"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "straight jacket", "aliases": ["拘束衣", "straightjacket"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "hogtie", "aliases": ["驷马倒攒", "hogtie_bondage"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "suspension", "aliases": ["悬吊", "suspension_bondage"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "spreader bar", "aliases": ["分腿棒", "spreader_bar"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "tape", "aliases": ["胶带束缚", "tape_bondage"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "collar", "aliases": ["项圈", "collar_neck"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "leash", "aliases": ["狗链", "牵引绳", "leash"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "harness", "aliases": ["束带", "皮革束带", "body_harness"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "ball gag", "aliases": ["球形口塞", "ball_gag"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "ring gag", "aliases": ["环形口塞", "ring_gag"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bit gag", "aliases": ["马衔口塞", "bit_gag"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "tape gag", "aliases": ["胶带封嘴", "tape_gag"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "blindfold", "aliases": ["蒙眼布", "眼罩", "blindfold"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "nose hook", "aliases": ["鼻钩", "nose_hook"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "nipple clamps", "aliases": ["乳头夹", "nipple_clamps"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "nipple chain", "aliases": ["乳头链", "nipple_chain"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "anal beads", "aliases": ["拉珠", "anal_beads"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "tail plug", "aliases": ["尾巴塞", "兽尾肛塞", "tail_plug"], "category": "nsfw_bdsm", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "dildo", "aliases": ["假阳具", "dildo"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "realistic dildo", "aliases": ["拟真假阳具", "realistic_dildo"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "glass dildo", "aliases": ["玻璃假阳具", "glass_dildo"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "crystal dildo", "aliases": ["水晶假阳具", "crystal_dildo"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "tentacle", "aliases": ["触手", "tentacle"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "double dildo", "aliases": ["双头龙", "double_dildo"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "vibrator", "aliases": ["振动棒", "vibrator"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "wand", "aliases": ["按摩棒", "magic_wand_vibrator"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "anal plug", "aliases": ["肛塞", "anal_plug"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "butt plug", "aliases": ["肛塞", "butt_plug"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "jeweled plug", "aliases": ["宝石肛塞", "jeweled_butt_plug"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "lubricant", "aliases": ["润滑液", "lubricant"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "undressing", "aliases": ["正在脱衣", "undressing"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "half-removed", "aliases": ["脱了一半", "half_removed_clothes"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "panties aside", "aliases": ["内裤拨到一边", "panties_aside"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "panties down", "aliases": ["内裤褪下", "panties_down"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bra lift", "aliases": ["掀起文胸", "bra_lift"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "skirt lift", "aliases": ["掀起裙子", "skirt_lift"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "clothes between breasts", "aliases": ["衣服夹在胸间", "clothes_between_breasts"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "topless", "aliases": ["上身赤裸", "topless"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "bottomless", "aliases": ["下身赤裸", "bottomless"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "no panties", "aliases": ["没穿内裤", "no_panties", "commando"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "no bra", "aliases": ["没穿文胸", "no_bra", "braless"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "unzipped", "aliases": ["拉链拉开", "unzipped"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "unbuttoned", "aliases": ["扣子解开", "unbuttoned"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "messy bed", "aliases": ["凌乱的床", "messy_bed", "事后感"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "x-cross", "aliases": ["X型架", "x_cross_bondage"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "cage", "aliases": ["笼子", "cage_confinement"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}, {"canonical_tag": "pole", "aliases": ["钢管", "stripper_pole"], "category": "nsfw_toys", "related": [], "conflicts": [], "source": "adapter"}];
+
+// ── 存储键 ────────────────────────────────────────────────
+const KEY="nai_chars_v1", VKEY="nai_sel_v1", LKEY="nai_lib_v1", CKEY="nai_custom_v1";
+
+let chars = JSON.parse(localStorage.getItem(KEY)||"[]");
+let editing = null, intent = "none";
+let customVocabulary = JSON.parse(localStorage.getItem(CKEY)||"[]");
+let selected = new Set(JSON.parse(localStorage.getItem(VKEY)||"[]"));
+let activeCategory = "all";
+let library = JSON.parse(localStorage.getItem(LKEY)||"[]");
+let editingSave = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+// ── 分类显示名 ────────────────────────────────────────────
+const CAT_LABEL = {
+  all:        "🔍 全部",
+  appearance: "👤 外貌",
+  hair:       "💇 发型",
+  eyes:       "👁 眼睛",
+  face:       "😶 面部",
+  clothing:   "👗 服装",
+  accessories:"💍 配饰",
+  footwear:   "👟 鞋履",
+  action:     "🏃 动作",
+  pose:       "🧍 姿势",
+  environment:"🌆 环境",
+  composition:"🎞 构图",
+  camera:     "📷 镜头",
+  lighting:   "💡 光线",
+  nsfw_lingerie: "🔞 女性内衣",
+  nsfw_male:     "🔞 男士内衣",
+  nsfw_legwear:  "🔞 丝袜腿饰",
+  nsfw_bdsm:     "🔞 束缚道具",
+  nsfw_toys:     "🔞 情趣道具",
+};
+
+// ── 词库合并 ──────────────────────────────────────────────
+function allVocabulary(){
+  const merged = [...BUILT_IN_VOCAB, ...customVocabulary.map(e=>({...e,source:"custom"}))];
+  const map = new Map();
+  merged.forEach(e=>{ if(e&&e.canonical_tag) map.set(String(e.canonical_tag).trim(), e) });
+  return [...map.values()];
+}
+
+function categories(){
+  const order = ["all","appearance","hair","eyes","face","clothing","accessories","footwear",
+                 "action","pose","environment","composition","camera","lighting",
+                 "nsfw_lingerie","nsfw_male","nsfw_legwear","nsfw_bdsm","nsfw_toys"];
+  const existing = new Set(allVocabulary().map(e=>e.category).filter(Boolean));
+  const result = order.filter(c=> c==="all" || existing.has(c));
+  // 追加不在order里的分类
+  existing.forEach(c=>{ if(!order.includes(c)) result.push(c); });
+  return result;
+}
+
+// ── 角色管理 ──────────────────────────────────────────────
+function saveChars(){ localStorage.setItem(KEY,JSON.stringify(chars)); renderChars(); renderMini(); }
+function renderChars(){
+  const box=$("#chars");
+  box.innerHTML = chars.length
+    ? chars.map((c,i)=>`<div class="char"><b>${esc(c.name)}</b>
+        <div class="small">${esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")}${c.locked?' · <span>已锁定</span>':""}</div>
+        <div class="row"><button onclick="editChar(${i})">编辑</button><button class="danger" onclick="delChar(${i})">删除</button></div>
+      </div>`).join("")
+    : '<div class="small">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>';
+}
+function renderMini(){
+  const box=$("#charMini");
+  box.innerHTML = chars.length
+    ? chars.map(c=>`<div class="char"><b>${esc(c.name)}</b><div class="small">${esc([c.gender,c.hair,c.eye].filter(Boolean).join(" · ")||"外貌未设置")}</div></div>`).join("")
+    : '<div class="small">暂无角色</div>';
+}
+window.editChar = i=>{
+  editing=i; const c=chars[i];
+  $("#cname").value=c.name; $("#cgender").value=c.gender; $("#chair").value=c.hair;
+  $("#ceye").value=c.eye; $("#ccloth").value=c.cloth; $("#cfeature").value=c.feature;
+  $("#clock").checked=!!c.locked; $("#editor").classList.remove("hidden");
+};
+window.delChar = i=>{ chars.splice(i,1); saveChars(); };
+$("#newChar").onclick = ()=>{
+  editing=null;
+  ["cname","cgender","chair","ceye","ccloth","cfeature"].forEach(id=>$("#"+id).value="");
+  $("#clock").checked=false; $("#editor").classList.remove("hidden");
+};
+$("#cancelChar").onclick = ()=> $("#editor").classList.add("hidden");
+$("#saveChar").onclick = ()=>{
+  const c={name:$("#cname").value.trim(),gender:$("#cgender").value.trim(),hair:$("#chair").value.trim(),
+           eye:$("#ceye").value.trim(),cloth:$("#ccloth").value.trim(),feature:$("#cfeature").value.trim(),
+           locked:$("#clock").checked};
+  if(!c.name) return;
+  editing===null ? chars.push(c) : chars[editing]=c;
+  saveChars(); $("#editor").classList.add("hidden");
+};
+
+// ── 导航 ──────────────────────────────────────────────────
+function showPage(id){
+  document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));
+  document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id));
+}
+document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+document.querySelectorAll("[data-intent]").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("[data-intent]").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); intent=b.dataset.intent;
+});
+
+// ── 词库渲染 ──────────────────────────────────────────────
+function renderCats(){
+  const cats = categories();
+  const sel = $("#categorySelect");
+  sel.innerHTML = cats.map(c=>`<option value="${esc(c)}" ${c===activeCategory?"selected":""}>${esc(CAT_LABEL[c]||c)}</option>`).join("");
+  sel.onchange = e=>{ activeCategory=e.target.value; renderVocab(); };
+  const source = $("#vsource").value;
+  const count = allVocabulary().filter(e=>{
+    if(activeCategory!=="all" && e.category!==activeCategory) return false;
+    if(source==="local" && e.source==="custom") return false;
+    if(source==="custom" && e.source!=="custom") return false;
+    return true;
+  }).length;
+  $("#catCount").textContent = count + " 条";
+}
+
+function renderVocab(){
+  renderCats();
+  const q = $("#vsearch").value.trim().toLowerCase();
+  const source = $("#vsource").value;
+  const list = allVocabulary().filter(e=>{
+    if(activeCategory!=="all" && e.category!==activeCategory) return false;
+    if(source==="local" && e.source==="custom") return false;
+    if(source==="custom" && e.source!=="custom") return false;
+    if(q && ![e.canonical_tag,...(e.aliases||[])].join(" ").toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $("#vocabCount").textContent = `显示 ${list.length} 条 · 已选 ${selected.size} 条`;
+  $("#vocabGrid").innerHTML = list.map(e=>`
+    <div class="vocab ${selected.has(e.canonical_tag)?"selected":""}" data-tag="${esc(e.canonical_tag)}">
+      <div class="vocab-top">
+        <input type="checkbox" ${selected.has(e.canonical_tag)?"checked":""}>
+        <span class="tag">${esc(e.canonical_tag)}</span>
+      </div>
+      <div class="meta">${esc(CAT_LABEL[e.category]||e.category||"")}</div>
+      <div class="alias">${esc((e.aliases||[]).join(" · ")||"无中文别名")}</div>
+    </div>`).join("");
+  document.querySelectorAll(".vocab").forEach(el=>el.onclick=ev=>{
+    if(ev.target.tagName==="INPUT") return;
+    toggleTag(el.dataset.tag);
+  });
+  document.querySelectorAll(".vocab input").forEach((el,i)=>el.onchange=()=>toggleTag(list[i].canonical_tag));
+}
+
+function toggleTag(tag){
+  selected.has(tag) ? selected.delete(tag) : selected.add(tag);
+  localStorage.setItem(VKEY, JSON.stringify([...selected]));
+  renderVocab(); renderSelected();
+}
+function renderSelected(){
+  $("#selectedTags").innerHTML = selected.size
+    ? [...selected].map(t=>`<span class="chip">${esc(t)}</span>`).join("")
+    : '<span class="small">暂无手动选择</span>';
+}
+$("#vsearch").oninput = renderVocab;
+$("#vsource").onchange = renderVocab;
+$("#clearSelected").onclick = ()=>{ selected.clear(); localStorage.setItem(VKEY,"[]"); renderVocab(); renderSelected(); };
+$("#applySelected").onclick = ()=>{ showPage("translatePage"); $("#status").textContent="已应用 "+selected.size+" 个手选标签。"; };
+
+// ── 词库匹配 ──────────────────────────────────────────────
+function matchVocabulary(text){
+  return allVocabulary().filter(e=>
+    [e.canonical_tag,...(e.aliases||[])].some(x=>x && text.toLowerCase().includes(String(x).toLowerCase()))
+  );
+}
+
+// ── 核心编译器 ────────────────────────────────────────────
+function parse(text){
+  const tags=[], add=(x,w=1)=>{ if(x&&!tags.some(t=>t.tag===x)) tags.push({tag:x,weight:w}); };
+  const conflicts=[];
+  if(!text) return "";
+
+  // 语义映射层（中文自然语言 → NAI标签）
+  const semanticMap=[
+    // 动作
+    [/站着|站立|站在|站起/,"standing"],
+    [/坐着|坐在|坐下/,"sitting"],
+    [/走着|走路|行走|漫步/,"walking"],
+    [/跑着|跑步|奔跑/,"running"],
+    [/跪着|跪下|跪在/,"kneeling"],
+    [/躺着|躺在|躺下/,"lying down"],
+    [/趴着|趴在/,"lying on stomach"],
+    [/牵手|牵着手|手牵手/,"holding hands"],
+    [/拥抱|抱住|抱着/,"hugging"],
+    [/看着对方|互相看|对视/,"looking at each other"],
+    [/背对背/,"back to back"],
+    [/伸手|伸出手/,"reaching out"],
+    [/靠着|倚着|倚靠/,"leaning against"],
+    [/亲吻|接吻|吻着/,"kiss"],
+    // 外貌
+    [/黑发|黑色头发/,"black hair"],
+    [/白发|白色头发/,"white hair"],
+    [/金发|金色头发/,"blonde hair"],
+    [/银发|银色头发/,"silver hair"],
+    [/红发|红色头发/,"red hair"],
+    [/蓝发|蓝色头发/,"blue hair"],
+    [/棕发|棕色头发/,"brown hair"],
+    [/粉发|粉色头发/,"pink hair"],
+    [/紫发|紫色头发/,"purple hair"],
+    [/长发|长头发/,"long hair"],
+    [/短发|短头发/,"short hair"],
+    [/双马尾/,"twintails"],
+    [/马尾/,"ponytail"],
+    [/麻花辫|辫子/,"braid"],
+    [/红眼|红色眼睛|红瞳/,"red eyes"],
+    [/蓝眼|蓝色眼睛|蓝瞳/,"blue eyes"],
+    [/绿眼|绿色眼睛|绿瞳/,"green eyes"],
+    [/金眼|金色眼睛/,"yellow eyes"],
+    [/紫眼|紫色眼睛/,"purple eyes"],
+    [/眼镜/,"glasses"],
+    // 服装
+    [/校服/,"school uniform"],
+    [/黑西装/,"black suit"],
+    [/黑大衣|黑色大衣/,"black coat"],
+    [/白裙|白色连衣裙/,"white dress"],
+    [/和服/,"kimono"],
+    [/旗袍/,"qipao"],
+    [/水手服/,"sailor uniform"],
+    [/女仆装/,"maid outfit"],
+    [/兔女郎/,"bunnysuit"],
+    [/比基尼/,"bikini"],
+    [/泳装/,"swimsuit"],
+    // 环境
+    [/雨中|下雨|雨天|雨夜/,"rain"],
+    [/雪中|下雪|雪天/,"snow"],
+    [/雾气|雾中|大雾/,"fog"],
+    [/霓虹|霓虹灯/,"neon lights"],
+    [/街灯|路灯/,"street lights"],
+    [/黄昏|夕阳|日落/,"sunset"],
+    [/清晨|日出/,"sunrise"],
+    [/夜晚|夜间|夜里/,"night"],
+    [/白天|白日/,"day"],
+    [/室内/,"indoors"],
+    [/室外|户外/,"outdoors"],
+    [/学校|教室/,"school"],
+    [/咖啡厅|咖啡馆/,"cafe"],
+    [/海边|海滩/,"beach"],
+    [/森林|树林/,"forest"],
+    [/城市|街道/,"city"],
+    // 光线
+    [/逆光/,"backlighting"],
+    [/柔光|柔和的光/,"soft lighting"],
+    [/戏剧性光线|强烈光影/,"dramatic lighting"],
+    [/赛博朋克|赛博/,"cyberpunk"],
+    // 构图
+    [/电影感|电影般|影视感|镜头感/,"cinematic composition"],
+    [/景深/,"depth of field"],
+    [/特写|近景/,"close-up"],
+    [/远景|广角/,"wide shot"],
+    [/低机位|低角度/,"low angle"],
+    [/高机位|高角度/,"high angle"],
+    [/负空间|留白/,"negative space"],
+    [/偏构图|偏置/,"off-center composition"],
+    [/动态构图|动感/,"dynamic composition"],
+    [/荷兰角|倾斜镜头/,"dutch angle"],
+    // 情绪/意图
+    [/孤独|寂寥|空旷|疏离/,"negative space"],
+    [/紧张|压迫感|冲突感/,"dramatic lighting"],
+  ];
+  semanticMap.forEach(([re,tag])=>{ if(re.test(text)) add(tag, 1.08); });
+
+  // 从词库匹配
+  const hits = matchVocabulary(text);
+  const matchedChars = chars.filter(c=>c.name && text.includes(c.name));
+  const genericPerson = /男生|男孩|男人|男性|女生|女孩|女人|女性|角色|人物/.test(text);
+
+  const appearanceFor = c=>[c.hair,c.eye,c.cloth,c.feature].filter(Boolean);
+  const scopeFor = (c,index)=>{
+    const positions = matchedChars.map(x=>text.indexOf(x.name));
+    const pos=positions[index], next=positions.filter(p=>p>pos);
+    const end = next.length ? Math.min(...next) : text.length;
+    return text.slice(Math.max(0,pos-60), Math.min(text.length,end+120));
+  };
+  const classifyScope = scope=>{
+    const out={actions:[],poses:[],clothing:[],appearance:[]};
+    matchVocabulary(scope).forEach(e=>{
+      if(e.category==="action") out.actions.push(e.canonical_tag);
+      else if(e.category==="pose") out.poses.push(e.canonical_tag);
+      else if(["clothing","accessories","footwear"].includes(e.category)) out.clothing.push(e.canonical_tag);
+      else if(["appearance","hair","eyes","face"].includes(e.category)) out.appearance.push(e.canonical_tag);
+    });
+    semanticMap.forEach(([re,tag])=>{ if(re.test(scope)){
+      const actionTags=["standing","sitting","walking","running","holding hands","hugging","looking at each other","back to back","reaching out","kneeling","lying down","lying on stomach","kiss"];
+      const appearTags=["black hair","white hair","blonde hair","silver hair","red hair","blue hair","brown hair","pink hair","purple hair","long hair","short hair","twintails","ponytail","braid","red eyes","blue eyes","green eyes","yellow eyes","purple eyes","glasses"];
+      const clothTags=["school uniform","black suit","black coat","white dress","kimono","qipao","sailor uniform","maid outfit","bunnysuit","bikini","swimsuit"];
+      if(actionTags.includes(tag)) out.actions.push(tag);
+      else if(appearTags.includes(tag)) out.appearance.push(tag);
+      else if(clothTags.includes(tag)) out.clothing.push(tag);
+    }});
+    return out;
+  };
+
+  if(matchedChars.length){
+    add(matchedChars.length===2?"2people":matchedChars.length===1?(matchedChars[0].gender==="男"?"1boy":matchedChars[0].gender==="女"?"1girl":"1person"):matchedChars.length+"people",1.05);
+    matchedChars.forEach((c,i)=>{
+      const scope=scopeFor(c,i);
+      const base=appearanceFor(c);
+      const scoped=classifyScope(scope);
+      const temporary=scoped.clothing.length||scoped.appearance.length;
+      if(c.locked||!temporary) base.forEach((x,j)=>add(x,j<2?1.22:1.12));
+      else{
+        const overridden=new Set(scoped.clothing.concat(scoped.appearance));
+        base.forEach(x=>{ if(!overridden.has(x)) add(x,1.1); });
+      }
+      scoped.clothing.concat(scoped.appearance).forEach(x=>add(x,1.2));
+      scoped.actions.concat(scoped.poses).forEach(x=>add(x,1.14));
+      const gender=/男生|男孩|男人|男性/.test(scope)?"1boy":/女生|女孩|女人|女性/.test(scope)?"1girl":null;
+      if(gender) add(gender,1.04);
+      if(scoped.actions.includes("standing")&&scoped.actions.includes("sitting")) conflicts.push(c.name+": standing/sitting");
+      if(scoped.actions.includes("walking")&&scoped.actions.includes("running")) conflicts.push(c.name+": walking/running");
+    });
+  } else {
+    hits.forEach(e=>add(e.canonical_tag, e.category==="appearance"||e.category==="hair"||e.category==="eyes"||e.category==="face"?1.18:e.category==="action"?1.12:1));
+    if(/两个|2个|两名|两人|一男一女/.test(text)) add("2people");
+    else if(/女生|女孩|女人|女性/.test(text)) add("1girl");
+    else if(/男生|男孩|男人|男性/.test(text)) add("1boy");
+    if(/独自|一个人|单独|solo/.test(text)) add("solo");
+  }
+
+  // 直接输入的英文NAI标签透传
+  const englishTokens=text.match(/[A-Za-z][A-Za-z0-9_-]{2,}(?:\s+[A-Za-z][A-Za-z0-9_-]{2,})?/g)||[];
+  englishTokens.forEach(x=>{
+    const t=x.trim().toLowerCase();
+    if(!/^(the|and|with|this|that|girl|boy|woman|man|character|person|wearing|standing|sitting|looking|very|beautiful|scene)$/i.test(t)) add(t,1);
+  });
+
+  // 手选标签
+  selected.forEach(t=>add(t,1.08));
+  if(genericPerson&&!matchedChars.length&&!hits.some(e=>["appearance","hair","eyes","face"].includes(e.category))) add("[APPEARANCE]");
+
+  // 意图修饰
+  const effectiveIntent = intent!=="none" ? intent :
+    (/张力|紧张|压迫感|冲突感/.test(text)?"tension":
+     /电影感|电影般|镜头感|影视感/.test(text)?"cinematic":
+     /孤独|寂寥|空旷|疏离/.test(text)?"lonely":"none");
+
+  if(effectiveIntent==="tension")[
+    ["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],
+    ["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]
+  ].forEach(x=>add(x[0],x[1]));
+  if(effectiveIntent==="cinematic")[
+    ["cinematic composition",1.08],["cinematic lighting",1.08],
+    ["depth of field",1.06],["dramatic perspective",1.04]
+  ].forEach(x=>add(x[0],x[1]));
+  if(effectiveIntent==="lonely")[
+    ["wide shot",1.06],["off-center composition",1.08],
+    ["negative space",1.12],["soft atmospheric lighting",1.04]
+  ].forEach(x=>add(x[0],x[1]));
+
+  if(conflicts.length) $("#status").textContent="检测到角色冲突："+conflicts.join("；");
+  return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
+}
+
+$("#translate").onclick=()=>{
+  const result = parse($("#input").value.trim());
+  $("#prompt").textContent = result || "请输入自然语言描述。";
+  if(!result) return;
+  const vocabLoaded = allVocabulary().length;
+  $("#status").textContent = `编译完成 · 词库 ${vocabLoaded} 条 · 手选标签 ${selected.size} 条`;
+};
+$("#clear").onclick=()=>{ $("#input").value=""; $("#prompt").textContent="等待输入……"; $("#status").textContent=""; };
+$("#copy").onclick=async()=>{ await navigator.clipboard.writeText($("#prompt").textContent); $("#status").textContent="已复制 ✓"; };
+
+// ── 资料库 ────────────────────────────────────────────────
+function resetSaveForm(){ editingSave=null; $("#saveTitle").value=""; $("#saveTags").value=""; $("#saveNatural").value=""; $("#saveNai").value=""; }
+function persistLibrary(){ localStorage.setItem(LKEY,JSON.stringify(library)); renderLibrary(); }
+function renderLibrary(){
+  const q=$("#librarySearch").value.trim().toLowerCase(), filter=$("#libraryFilter").value;
+  const list=library.filter(e=>{
+    const all=[e.title,e.tags,e.natural,e.nai].join(" ").toLowerCase();
+    if(!q) return true;
+    if(filter==="tag") return String(e.tags||"").toLowerCase().includes(q);
+    if(filter==="nai") return String(e.nai||"").toLowerCase().includes(q);
+    return all.includes(q);
+  });
+  $("#saveList").innerHTML=list.length?list.map(e=>`
+    <div class="save-item"><b>${esc(e.title||"未命名")}</b>
+    <div class="small">${esc(e.updatedAt||"")}</div>
+    <div class="save-tags">${(e.tags||"").split(/[,，]/).filter(Boolean).map(t=>`<span class="save-tag">${esc(t.trim())}</span>`).join("")}</div>
+    <div class="small" style="margin-top:8px"><b>自然语言：</b>${esc(e.natural||"未记录")}</div>
+    <div class="prompt" style="min-height:0;margin-top:8px;font-size:12px">${esc(e.nai||"未记录")}</div>
+    <div class="save-actions">
+      <button onclick="loadSave('${e.id}')">载入编辑</button>
+      <button onclick="useSave('${e.id}')">载入编译器</button>
+      <button class="danger" onclick="deleteSave('${e.id}')">删除</button>
+    </div></div>`).join(""):'<div class="small">暂无保存内容。</div>';
+}
+window.loadSave=id=>{const e=library.find(x=>x.id===id);if(!e)return;editingSave=id;$("#saveTitle").value=e.title||"";$("#saveTags").value=e.tags||"";$("#saveNatural").value=e.natural||"";$("#saveNai").value=e.nai||"";$("#libraryStatus").textContent="正在编辑已保存资料。"};
+window.useSave=id=>{const e=library.find(x=>x.id===id);if(!e)return;$("#input").value=e.natural||"";$("#prompt").textContent=e.nai||"等待输入……";showPage("translatePage");$("#status").textContent="已载入："+(e.title||"未命名")};
+window.deleteSave=id=>{library=library.filter(x=>x.id!==id);persistLibrary()};
+$("#saveEntry").onclick=()=>{
+  const title=$("#saveTitle").value.trim()||"未命名";
+  const entry={id:editingSave||("p_"+Date.now()),title,tags:$("#saveTags").value.trim(),natural:$("#saveNatural").value.trim(),nai:$("#saveNai").value.trim(),updatedAt:new Date().toLocaleString("zh-CN")};
+  if(editingSave){const i=library.findIndex(x=>x.id===editingSave);if(i>=0)library[i]=entry}else library.unshift(entry);
+  persistLibrary();$("#libraryStatus").textContent="已保存 ✓";resetSaveForm();
+};
+$("#clearEntry").onclick=()=>{resetSaveForm();$("#libraryStatus").textContent=""};
+$("#librarySearch").oninput=renderLibrary;$("#libraryFilter").onchange=renderLibrary;
+$("#saveCurrent").onclick=()=>{
+  const natural=$("#input").value.trim(), nai=$("#prompt").textContent==="等待输入……"?"":$("#prompt").textContent;
+  $("#saveTitle").value=natural.slice(0,24)||"未命名";
+  $("#saveNatural").value=natural; $("#saveNai").value=nai;
+  showPage("libraryPage"); renderLibrary(); $("#libraryStatus").textContent="已带入表单，确认后保存。";
+};
+
+// ── 自定义词库导入导出 ────────────────────────────────────
+function renderCustomVocab(){
+  const box=$("#customVocabList");
+  if(!customVocabulary.length){box.innerHTML='<div class="small">暂无自定义词条。</div>';return;}
+  box.innerHTML=customVocabulary.map(e=>`<div class="import-item"><div><b>${esc(e.canonical_tag)}</b><div class="small">${esc((e.aliases||[]).join(" · ")||"无别名")} · ${esc(CAT_LABEL[e.category]||e.category||"custom")}</div></div></div>`).join("");
+}
+function normalizeImported(raw){
+  let arr=Array.isArray(raw)?raw:(Array.isArray(raw.entries)?raw.entries:(Array.isArray(raw.tags)?raw.tags:[]));
+  return arr.map(e=>{
+    if(typeof e==="string") return{canonical_tag:e.trim(),aliases:[],category:"custom",related:[],conflicts:[],source:"custom"};
+    const tag=String(e.canonical_tag||e.tag||e.name||e.prompt||"").trim();
+    if(!tag) return null;
+    const aliases=Array.isArray(e.aliases)?e.aliases:(Array.isArray(e.translations)?e.translations:(e.translation?[e.translation]:[]));
+    return{canonical_tag:tag,aliases:aliases.map(String).filter(Boolean),category:String(e.category||"custom"),related:[],conflicts:[],source:"custom"};
+  }).filter(Boolean);
+}
+$("#importVocab").onclick=()=>{
+  const file=$("#vocabFile").files[0];
+  if(!file){$("#importStatus").textContent="请先选择文件。";return;}
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      let imported=[];
+      if(/\.(txt|md)$/i.test(file.name)){
+        imported=String(reader.result).split(/\r?\n/).map(l=>l.trim()).filter(Boolean)
+          .map(l=>l.replace(/^[-*+]\s+/,"").trim())
+          .map(l=>{const parts=l.split(/\s*\|\s*|\s*,\s*/);return{canonical_tag:parts[0].trim(),aliases:parts.slice(1).filter(Boolean),category:"custom",related:[],conflicts:[],source:"custom"};})
+          .filter(e=>e.canonical_tag);
+      }else{
+        imported=normalizeImported(JSON.parse(reader.result));
+      }
+      if(!imported.length) throw new Error("没有识别到词条");
+      const map=new Map(customVocabulary.map(e=>[e.canonical_tag,e]));
+      imported.forEach(e=>map.set(e.canonical_tag,e));
+      customVocabulary=[...map.values()];
+      localStorage.setItem(CKEY,JSON.stringify(customVocabulary));
+      renderCustomVocab();renderVocab();
+      $("#importStatus").textContent=`已导入 ${imported.length} 条；自定义词库共 ${customVocabulary.length} 条。`;
+      $("#vocabFile").value="";
+    }catch(e){$("#importStatus").textContent="导入失败，请检查文件格式。";}
+  };
+  reader.readAsText(file);
+};
+$("#exportVocab").onclick=()=>{
+  const blob=new Blob([JSON.stringify({schema_version:"custom-1.0",entries:customVocabulary},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="nai-custom-vocabulary.json";a.click();URL.revokeObjectURL(a.href);
+};
+$("#clearCustomVocab").onclick=()=>{
+  if(!customVocabulary.length)return;
+  customVocabulary=[];localStorage.setItem(CKEY,"[]");renderCustomVocab();renderVocab();
+  $("#importStatus").textContent="已清空自定义词库。";
+};
+
+// ── 初始化 ────────────────────────────────────────────────
+renderChars(); renderMini(); renderSelected(); renderVocab(); renderLibrary(); renderCustomVocab();
+$("#status").textContent = `词库已就绪：${allVocabulary().length} 条（内置 ${BUILT_IN_VOCAB.length} 条）`;
+</script>
+</body>
+</html>
