@@ -46,8 +46,8 @@ label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{widt
 <div class="small">可以导入自己的 JSON 词库。自定义词库保存在当前浏览器，不会覆盖项目内置词库；导入后可在「词库预览」中搜索、分类和选择。</div>
 <div class="import-box">
 <label for="vocabFile">导入 JSON 词库</label>
-<input id="vocabFile" type="file" accept=".json,application/json">
-<div class="small" style="margin-top:7px">支持：entries 数组、直接数组，或常见的 tag / name / translation / aliases 字段。</div>
+<input id="vocabFile" type="file" accept=".json,.txt,text/plain,application/json">
+<div class="small" style="margin-top:7px">支持 JSON 的 entries 数组及常见字段；TXT 支持一行一个词，也支持「英文标签 | 中文别名」或「英文标签, 中文别名」。</div>
 <div class="row"><button class="primary" id="importVocab">导入词库</button><button id="exportVocab">导出我的词库</button><button class="danger" id="clearCustomVocab">清空我的词库</button></div>
 <div id="importStatus" class="status"></div>
 </div>
@@ -193,11 +193,19 @@ function renderCustomVocab(){
 }
 $("#importVocab").onclick=()=>{
   const file=$("#vocabFile").files[0];
-  if(!file){$("#importStatus").textContent="请先选择 JSON 文件。";return}
+  if(!file){$("#importStatus").textContent="请先选择 JSON 或 TXT 文件。";return}
   const reader=new FileReader();
   reader.onload=()=>{
     try{
-      const imported=normalizeImported(JSON.parse(reader.result));
+      let imported=[];
+      if(/\.txt$/i.test(file.name)){
+        imported=String(reader.result).split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
+          const parts=line.split(/\s*\|\s*|\s*,\s*/);
+          return {canonical_tag:parts[0].trim(),aliases:parts.slice(1).filter(Boolean),category:"custom",related:[],conflicts:[],source:"custom"};
+        }).filter(e=>e.canonical_tag&&!/^#/.test(e.canonical_tag));
+      }else{
+        imported=normalizeImported(JSON.parse(reader.result));
+      }
       if(!imported.length)throw new Error("没有识别到词条");
       const map=new Map(customVocabulary.map(e=>[e.canonical_tag,e]));
       imported.forEach(e=>map.set(e.canonical_tag,e));
@@ -206,7 +214,7 @@ $("#importVocab").onclick=()=>{
       renderCustomVocab();renderVocab();
       $("#importStatus").textContent="已导入 "+imported.length+" 条；当前自定义词库共 "+customVocabulary.length+" 条。";
       $("#vocabFile").value="";
-    }catch(e){$("#importStatus").textContent="导入失败：JSON 格式或词条结构无法识别。"}
+    }catch(e){$("#importStatus").textContent="导入失败：JSON 或 TXT 格式无法识别。"}
   };
   reader.readAsText(file);
 };
