@@ -343,7 +343,7 @@ function normalizeOpenSourceEntry(tag,alias){
 
 function parseOpenSourceCSV(raw){
   const map=new Map();
-  String(raw||"").split(/\\r?\\n/).forEach(line=>{
+  String(raw||"").split(/\r?\n/).forEach(line=>{
     const pair=parseCSVPairLine(line.trim());
     if(!pair) return;
     const e=normalizeOpenSourceEntry(pair.tag,pair.alias);
