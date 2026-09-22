@@ -529,9 +529,33 @@ $("#applySelected").onclick = ()=>{ showPage("translatePage"); $("#status").text
 
 // ── 词库匹配 ──────────────────────────────────────────────
 function matchVocabulary(text){
-  return allVocabulary().filter(e=>
-    [e.canonical_tag,...(e.aliases||[])].some(x=>x && text.toLowerCase().includes(String(x).toLowerCase()))
-  );
+  const source=String(text||"");
+  const entries=allVocabulary().filter(Boolean);
+  const candidates=[];
+  entries.forEach(entry=>{
+    [entry.canonical_tag,...(entry.aliases||[])]
+      .filter(x=>x && String(x).trim().length>=2)
+      .sort((a,b)=>String(b).length-String(a).length)
+      .forEach(alias=>{
+        const a=String(alias).trim();
+        let from=0;
+        while(from<source.length){
+          const pos=source.toLowerCase().indexOf(a.toLowerCase(),from);
+          if(pos<0) break;
+          candidates.push({entry,alias:a,pos,end:pos+a.length});
+          from=pos+a.length;
+        }
+      });
+  });
+  candidates.sort((a,b)=>(b.alias.length-a.alias.length)||(a.pos-b.pos));
+  const occupied=[];
+  const out=[];
+  candidates.forEach(hit=>{
+    if(occupied.some(r=>hit.pos<r.end && hit.end>r.pos)) return;
+    occupied.push(hit);
+    out.push(hit.entry);
+  });
+  return out;
 }
 
 // ── 核心编译器 ────────────────────────────────────────────
@@ -593,6 +617,7 @@ function parse(text){
     [/拥抱|抱住|抱着/,"hugging"],
     [/看着对方|互相看|对视/,"looking at each other"],
     [/背对背/,"back to back"],
+    [/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/,"pointing"],
     [/伸手|伸出手/,"reaching out"],
     [/撑伞|拿伞|打伞|拿着伞|撑着伞|手里拿着伞/,"holding umbrella"],
     [/靠着|倚着|倚靠/,"leaning against"],
@@ -731,12 +756,39 @@ function parse(text){
   }
 
 
+  // ── 语义词组编排器 ─────────────────────────────────────
+  // 先识别完整语义片段，再把动作、修饰语、宾语组成一个 NAI 语义单元。
+  // 这样“伸出手指”不会被拆成 finger，而会优先解释成 pointing。
+  const semanticGroups = [
+    {re:/伸出手指|伸手指向|用手指指向|手指指向|指着|指向|指给|指着看/, tags:["pointing"], phrase:"pointing"},
+    {re:/(牵着|牵住|牵手|手牵手)(.{0,8})(手)/, tags:["holding hands"], phrase:"holding hands"},
+    {re:/(坐在|坐着)(.{0,8})(窗边|靠窗)/, tags:["sitting","by window"], phrase:"sitting by window"},
+    {re:/(面对面|面对彼此|互相面对)(.{0,8})(坐着|坐在)/, tags:["facing each other","sitting"], phrase:"facing each other while sitting"},
+    {re:/(穿|穿着|身穿)(.{0,8})(白裙|白色连衣裙)/, tags:["white dress"], phrase:"wearing a white dress"},
+    {re:/(穿|穿着|身穿)(.{0,8})(黑西装|黑色西装)/, tags:["black suit"], phrase:"wearing a black suit"},
+    {re:/(撑伞|撑着伞|打伞|拿着伞)(.{0,8})(透明|黑色|白色)?/, tags:["holding umbrella"], phrase:"holding $3 umbrella"},
+    {re:/(手里拿着|拿着|手持|捧着)(.{0,8})(红花|红色的花)/, tags:["holding flower"], phrase:"holding a red flower"}
+  ];
+  const applySemanticGroups = () => {
+    semanticGroups.forEach(rule=>{
+      const m=text.match(rule.re);
+      if(!m) return;
+      const members=rule.tags.filter(t=>tags.some(x=>x.tag===t));
+      if(!members.length) return;
+      let phrase=rule.phrase;
+      for(let i=1;i<m.length;i++) phrase=phrase.replace("$"+i,m[i]||"");
+      phrase=phrase.replace(/\\s{2,}/g," ").replace(/\\s+umbrella$/," umbrella").trim();
+      if(!phrase || phrase.includes("$")) return;
+      members.forEach(removeTag);
+      add(phrase,Math.min(1.30,1.13+emphasisBoost));
+    });
+  };
+
   // ── 通用中文句子理解层 ───────────────────────────────────
   // 优先从完整词库寻找最长中文别名，再结合句子中的动作/关系词，
   // 将一句话拆成“人物 + 属性 + 动作 + 场景”，而不是只能依赖少量正则。
   const sentenceVocab = allVocabulary()
-    .filter(e=>e && e.canonical_tag &&
-      !["nsfw_lingerie","nsfw_male","nsfw_legwear","nsfw_bdsm","nsfw_toys"].includes(e.category))
+    .filter(e=>e && e.canonical_tag)
     .map(e=>({...e,_aliases:[e.canonical_tag,...(e.aliases||[])]
       .filter(Boolean).sort((a,b)=>String(b).length-String(a).length)}));
   const sentenceMatched = new Set(tags.map(x=>x.tag));
@@ -902,6 +954,7 @@ function parse(text){
   })();
 
   parseChinesePhrases();
+  applySemanticGroups();
 
   // ── 自然语义编排层 ─────────────────────────────────────
   // 词库负责“词是什么”，这里负责“这些词在句子里是什么关系”。
@@ -1058,7 +1111,16 @@ function parse(text){
 
   // 手选标签
   selected.forEach(t=>add(t,1.08));
-  if(genericPerson&&!matchedChars.length&&!hits.some(e=>["appearance","hair","eyes","face"].includes(e.category))) add("[APPEARANCE]");
+  const appearanceCategories=new Set(["appearance","hair","eyes","face"]);
+  const explicitAppearance=tags.some(x=>{
+    const e=entryFor(x.tag);
+    return e && appearanceCategories.has(e.category);
+  });
+  if(genericPerson&&!matchedChars.length&&!explicitAppearance){
+    const pIndex=tags.findIndex(x=>/^\\d+(?:girl|boy|people|person)$/.test(x.tag));
+    const appearanceTag={tag:"[APPEARANCE]",weight:1};
+    if(pIndex>=0) tags.splice(pIndex+1,0,appearanceTag); else tags.unshift(appearanceTag);
+  }
 
   // 意图修饰
   const effectiveIntent = intent!=="none" ? intent :
