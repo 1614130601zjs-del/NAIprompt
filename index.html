@@ -234,12 +234,27 @@ const BUILT_IN_VOCAB = [{"canonical_tag": "black hair", "aliases": ["黑发", "�
 // ── 存储键 ────────────────────────────────────────────────
 const KEY="nai_chars_v1", VKEY="nai_sel_v1", LKEY="nai_lib_v1", CKEY="nai_custom_v1";
 
-let chars = JSON.parse(localStorage.getItem(KEY)||"[]");
+function readJSON(key,fallback){
+  try{
+    const raw=localStorage.getItem(key);
+    if(!raw) return fallback;
+    const value=JSON.parse(raw);
+    return value;
+  }catch(e){
+    console.warn("NAI storage read failed:",key,e);
+    return fallback;
+  }
+}
+function writeJSON(key,value){
+  try{ localStorage.setItem(key,JSON.stringify(value)); }catch(e){ console.warn("NAI storage write failed:",key,e); }
+}
+
+let chars = readJSON(KEY,[]);
 let editing = null, intent = "none";
-let customVocabulary = JSON.parse(localStorage.getItem(CKEY)||"[]");
-let selected = new Set(JSON.parse(localStorage.getItem(VKEY)||"[]"));
+let customVocabulary = readJSON(CKEY,[]);
+let selected = new Set(readJSON(VKEY,[]));
 let activeCategory = "all";
-let library = JSON.parse(localStorage.getItem(LKEY)||"[]");
+let library = readJSON(LKEY,[]);
 let editingSave = null;
 
 const $ = s => document.querySelector(s);
@@ -288,7 +303,7 @@ function categories(){
 }
 
 // ── 角色管理 ──────────────────────────────────────────────
-function saveChars(){ localStorage.setItem(KEY,JSON.stringify(chars)); renderChars(); renderMini(); }
+function saveChars(){ writeJSON(KEY,chars); renderChars(); renderMini(); }
 function renderChars(){
   const box=$("#chars");
   box.innerHTML = chars.length
@@ -393,7 +408,7 @@ function renderSelected(){
 }
 $("#vsearch").oninput = renderVocab;
 $("#vsource").onchange = renderVocab;
-$("#clearSelected").onclick = ()=>{ selected.clear(); localStorage.setItem(VKEY,"[]"); renderVocab(); renderSelected(); };
+$("#clearSelected").onclick = ()=>{ selected.clear(); writeJSON(VKEY,[]); renderVocab(); renderSelected(); };
 $("#applySelected").onclick = ()=>{ showPage("translatePage"); $("#status").textContent="已应用 "+selected.size+" 个手选标签。"; };
 
 // ── 词库匹配 ──────────────────────────────────────────────
@@ -591,18 +606,25 @@ function parse(text){
 }
 
 $("#translate").onclick=()=>{
-  const result = parse($("#input").value.trim());
-  $("#prompt").textContent = result || "请输入自然语言描述。";
-  if(!result) return;
-  const vocabLoaded = allVocabulary().length;
-  $("#status").textContent = `编译完成 · 词库 ${vocabLoaded} 条 · 手选标签 ${selected.size} 条`;
+  try{
+    const textValue=$("#input").value.trim();
+    const result=parse(textValue);
+    $("#prompt").textContent=result||"请输入自然语言描述。";
+    $("#status").textContent=result
+      ? `编译完成 · 词库 ${allVocabulary().length} 条 · 手选标签 ${selected.size} 条`
+      : "请输入自然语言描述。";
+  }catch(e){
+    console.error("NAI prompt compile error:",e);
+    $("#prompt").textContent="生成失败，请重试。";
+    $("#status").textContent="编译器错误："+(e&&e.message?e.message:String(e));
+  }
 };
 $("#clear").onclick=()=>{ $("#input").value=""; $("#prompt").textContent="等待输入……"; $("#status").textContent=""; };
 $("#copy").onclick=async()=>{ await navigator.clipboard.writeText($("#prompt").textContent); $("#status").textContent="已复制 ✓"; };
 
 // ── 资料库 ────────────────────────────────────────────────
 function resetSaveForm(){ editingSave=null; $("#saveTitle").value=""; $("#saveTags").value=""; $("#saveNatural").value=""; $("#saveNai").value=""; }
-function persistLibrary(){ localStorage.setItem(LKEY,JSON.stringify(library)); renderLibrary(); }
+function persistLibrary(){ writeJSON(LKEY,library); renderLibrary(); }
 function renderLibrary(){
   const q=$("#librarySearch").value.trim().toLowerCase(), filter=$("#libraryFilter").value;
   const list=library.filter(e=>{
@@ -677,7 +699,7 @@ $("#importVocab").onclick=()=>{
       const map=new Map(customVocabulary.map(e=>[e.canonical_tag,e]));
       imported.forEach(e=>map.set(e.canonical_tag,e));
       customVocabulary=[...map.values()];
-      localStorage.setItem(CKEY,JSON.stringify(customVocabulary));
+      writeJSON(CKEY,customVocabulary);
       renderCustomVocab();renderVocab();
       $("#importStatus").textContent=`已导入 ${imported.length} 条；自定义词库共 ${customVocabulary.length} 条。`;
       $("#vocabFile").value="";
@@ -691,7 +713,7 @@ $("#exportVocab").onclick=()=>{
 };
 $("#clearCustomVocab").onclick=()=>{
   if(!customVocabulary.length)return;
-  customVocabulary=[];localStorage.setItem(CKEY,"[]");renderCustomVocab();renderVocab();
+  customVocabulary=[];writeJSON(CKEY,[]);renderCustomVocab();renderVocab();
   $("#importStatus").textContent="已清空自定义词库。";
 };
 
