@@ -540,6 +540,45 @@ function parse(text){
   const conflicts=[];
   if(!text) return "";
 
+  // 中文自然句归一化：把“黑色的头发 / 穿着黑色西装 / 蓝色的眼睛”等
+  // 常见表达统一成词库更容易识别的形式。这里不翻译句子，只消除中文语法表面的差异。
+  const normalizeNaturalChinese = input => {
+    let s=String(input||"")
+      .replace(/[\u3000]/g," ")
+      .replace(/[“”‘’]/g,"")
+      .replace(/\s+/g," ")
+      .trim();
+    const rules=[
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?头发/g,"$1发"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?眼睛/g,"$1眼"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?眼眸/g,"$1眼"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?头发/g,"$1发"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(裙子|裙装)/g,"$1裙"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(西装|套装)/g,"$1西装"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(大衣|外套)/g,"$1大衣"],
+      [/([黑白红蓝绿黄紫粉棕灰银金])色的?(眼镜)/g,"$1眼镜"],
+      [/长长的?头发/g,"长发"],
+      [/短短的?头发/g,"短发"],
+      [/戴着|戴了|佩戴着/g,"戴"],
+      [/穿着|身穿|穿上|穿了|穿着一身/g,"穿"],
+      [/拿着|手里拿着|手持|握着|捧着/g,"拿"],
+      [/撑着|撑着一把|打着|打着一把/g,"撑伞"],
+      [/正在站着|正站着|站立着/g,"站着"],
+      [/正在坐着|正坐着/g,"坐着"],
+      [/正在走着|正走着|正在行走/g,"走着"],
+      [/正在跑着|正跑着|正在奔跑/g,"跑着"],
+      [/正在看着|正看着/g,"看着"],
+      [/正在下雨/g,"下雨"],
+      [/在下雨的天气里/g,"雨天"],
+      [/在下着雨的夜晚/g,"雨夜"],
+      [/一个年轻的女生|一位年轻女生|年轻的女生/g,"女生"],
+      [/一个年轻的男生|一位年轻男生|年轻的男生/g,"男生"]
+    ];
+    rules.forEach(([re,to])=>{ s=s.replace(re,to); });
+    return s;
+  };
+  text = normalizeNaturalChinese(text);
+
   // 语义映射层（中文自然语言 → NAI标签）
   const semanticMap=[
     // 动作
@@ -1044,14 +1083,20 @@ function parse(text){
   return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
 }
 
-$("#translate").onclick=()=>{
+$("#translate").onclick=async()=>{
   try{
     const textValue=$("#input").value.trim();
+    if(!textValue){ $("#prompt").textContent="请输入自然语言描述。"; return; }
+    // 用户可能在开源词库还没加载完时就点击生成；先确保词库可用。
+    if(!OPEN_SOURCE_VOCAB.length){
+      $("#status").textContent="正在加载开源中文词库…";
+      await loadOpenSourceVocab();
+    }
     const result=parse(textValue);
-    $("#prompt").textContent=result||"请输入自然语言描述。";
+    $("#prompt").textContent=result||"未识别到可转换的 NAI 标签。";
     $("#status").textContent=result
-      ? `编译完成 · 词库 ${allVocabulary().length} 条 · 手选标签 ${selected.size} 条`
-      : "请输入自然语言描述。";
+      ? `自然语言编译完成 · 词库 ${allVocabulary().length} 条 · 手选标签 ${selected.size} 条`
+      : "没有找到可转换的词库标签，请补充更具体的描述。";
   }catch(e){
     console.error("NAI prompt compile error:",e);
     $("#prompt").textContent="生成失败，请重试。";
