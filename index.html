@@ -692,6 +692,102 @@ function parse(text){
   }
 
 
+  // ── 通用句法/短语解析层 ─────────────────────────────────
+  // 开源词库只负责提供“词”，这里负责把“修饰词 + 中心词 + 动作 + 场景”
+  // 从中文句子中组合成可用的 NAI 多词标签。不会凭空制造不存在的基础词。
+  const parseChinesePhrases = () => {
+    const entries = allVocabulary();
+    const lowerText = text.toLowerCase();
+
+    const colorMap = [
+      ["黑色","black"],["黑","black"],["白色","white"],["白","white"],
+      ["红色","red"],["红","red"],["蓝色","blue"],["蓝","blue"],
+      ["绿色","green"],["绿","green"],["黄色","yellow"],["黄","yellow"],
+      ["紫色","purple"],["紫","purple"],["粉色","pink"],["粉","pink"],
+      ["棕色","brown"],["棕","brown"],["灰色","grey"],["灰","grey"],
+      ["银色","silver"],["银","silver"]
+    ];
+    const lengthMap=[["很长","long"],["长","long"],["很短","short"],["短","short"]];
+    const findEntry = tag => entries.find(e=>e.canonical_tag===tag);
+    const aliasesFor = e => [e.canonical_tag,...(e.aliases||[])].filter(Boolean);
+    const posOf = e => aliasesFor(e).map(a=>text.indexOf(a)).filter(i=>i>=0).sort((a,b)=>a-b)[0] ?? -1;
+
+    const existing = new Set(tags.map(x=>x.tag));
+    const addPhrase=(phrase,weight=1.12,consume=[])=>{
+      if(!phrase || tags.some(x=>x.tag===phrase)) return;
+      consume.forEach(t=>removeTag(t));
+      add(phrase,Math.min(1.30,weight+emphasisBoost));
+    };
+
+    // 找到中文句子中的中心名词，再读取它前面的颜色/长度等修饰语。
+    entries.forEach(e=>{
+      if(!e||!e.canonical_tag||e.category==="open_source") return;
+      const ep=posOf(e);
+      if(ep<0) return;
+      const before=text.slice(Math.max(0,ep-12),ep);
+      const modifiers=[];
+      colorMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
+      lengthMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
+      if(!modifiers.length) return;
+      const phrase=[...new Set(modifiers)].concat(e.canonical_tag).join(" ");
+      if(modifiers.length && !existing.has(phrase)) addPhrase(phrase,1.10,[e.canonical_tag,...modifiers.filter(x=>existing.has(x))]);
+    });
+
+    // 对开源中文词库中的名词同样进行颜色/长度组合。
+    entries.filter(e=>e&&e.category==="open_source").forEach(e=>{
+      const ep=posOf(e);
+      if(ep<0) return;
+      const before=text.slice(Math.max(0,ep-12),ep);
+      const modifiers=[];
+      colorMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
+      lengthMap.forEach(([zh,en])=>{ if(before.includes(zh)) modifiers.push(en); });
+      if(!modifiers.length) return;
+      const phrase=[...new Set(modifiers)].concat(e.canonical_tag).join(" ");
+      addPhrase(phrase,1.08);
+    });
+
+    // 常见“动作 + 场景/宾语”句式：优先保留动作和名词，再组合成自然的 NAI 短语。
+    const relationPatterns=[
+      {re:/(拿着|拿了|手里拿着|拿着一把)(.{0,8})(伞)/, action:"holding umbrella", object:/伞/},
+      {re:/(撑着|撑伞|打着|打伞)(.{0,8})(伞)/, action:"holding umbrella", object:/伞/},
+      {re:/(抱着|抱住)(.{0,8})(猫|狗|兔子)/, action:"holding", object:/猫|狗|兔子/},
+      {re:/(看着|望着|注视着)(.{0,8})(对方|彼此|她|他)/, action:"looking at each other"},
+      {re:/(靠着|倚着)(.{0,8})(墙|窗|门|树)/, action:"leaning against"},
+      {re:/(坐在|坐着)(.{0,8})(椅子|沙发|床|地面)/, action:"sitting"},
+    ];
+    relationPatterns.forEach(r=>{
+      const m=text.match(r.re);
+      if(!m) return;
+      const objectZh=m[3]||"";
+      const objectEntry=objectZh ? entries.find(e=>aliasesFor(e).some(a=>a===objectZh)) : null;
+      const objectTag=objectEntry?.canonical_tag;
+      if(objectTag){
+        const phrase=r.action+" "+objectTag;
+        addPhrase(phrase,1.13,[r.action,objectTag]);
+      }
+    });
+
+    // 中文“在X里/在X中/于X”场景关系。
+    const scenePatterns=[
+      ["在雨中","in the rain","rain"],
+      ["在雨夜","in the rain at night","rain","night"],
+      ["在夜里","at night","night"],
+      ["在夜晚","at night","night"],
+      ["在室内","indoors","indoors"],
+      ["在室外","outdoors","outdoors"],
+      ["在森林里","in the forest","forest"],
+      ["在海边","at the beach","beach"],
+      ["在街道上","on the street","street"],
+    ];
+    scenePatterns.forEach(([zh,phrase,...members])=>{
+      if(!text.includes(zh)) return;
+      const presentMembers=members.filter(t=>present.has(t));
+      if(presentMembers.length) addPhrase(phrase,1.10,presentMembers);
+    });
+  };
+
+  parseChinesePhrases();
+
   // ── 自然语义编排层 ─────────────────────────────────────
   // 词库负责“词是什么”，这里负责“这些词在句子里是什么关系”。
   // 只使用已经识别出的词库标签；关系、修饰和强调只改变组织方式与权重。
