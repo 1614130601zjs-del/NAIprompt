@@ -30,3 +30,10 @@
 → NAI Prompt 编译
 
 后续再加入真正的 AI 语义解析/API，以及更完整的 NAI 标签词库。
+
+
+## 一键部署到 Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/1614130601zjs-del/NAIprompt)
+
+点击上面的按钮即可将前端作为 Render Static Site 部署。
