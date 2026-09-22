@@ -577,41 +577,71 @@ function parse(text){
   }
 
 
-  // ── 语义编排：把已有标签按自然语义关系组合，并按信息重要性动态加权 ──
-  // 这里只组合已经进入 tags 的词，不凭空创建新的词库标签。
-  const semanticWeight = (tag, base=1.08) => {
-    const emphasis = [
-      [/最重要|重点是|核心是|关键是|一定要|必须有|不能丢|不要丢/, 0.10],
-      [/非常|极其|特别|格外|紧紧|牢牢|明显|强烈/, 0.06],
-      [/有些|略显|隐约|淡淡|轻微|稍微/, -0.03]
-    ];
-    let w=base;
-    emphasis.forEach(([re,delta])=>{ if(re.test(text)) w+=delta; });
-    const core = ["hugging","holding umbrella","holding flower","holding hands","looking at each other","kiss","facing each other"];
-    if(core.includes(tag)) w+=0.04;
-    if(["street","city","night","day","rain","snow","indoors","outdoors"].includes(tag)) w-=0.02;
-    return Math.max(0.98,Math.min(1.25,w));
-  };
+  // ── 自然语义编排层 ─────────────────────────────────────
+  // 词库负责“词是什么”，这里负责“这些词在句子里是什么关系”。
+  // 只使用已经识别出的词库标签；关系、修饰和强调只改变组织方式与权重。
+  const semanticSource = [...tags].map(x=>({
+    tag:x.tag, weight:x.weight, category:(allVocabulary().find(v=>v.canonical_tag===x.tag)||{}).category||"unknown"
+  }));
 
+  const hasAny = (...xs) => xs.some(x=>present.has(x));
   const present = new Set(tags.map(x=>x.tag));
-  const removeTags = set => {
-    for(let i=tags.length-1;i>=0;i--) if(set.has(tags[i].tag)) tags.splice(i,1);
+  const indexOfTag = tag => tags.findIndex(x=>x.tag===tag);
+  const removeTag = tag => {
+    const i=indexOfTag(tag);
+    if(i>=0) tags.splice(i,1);
+    present.delete(tag);
   };
-  const addGroup = (members, phrase, weight) => {
-    const existing=members.filter(x=>present.has(x));
-    if(existing.length>=2){
-      removeTags(new Set(existing));
-      add(phrase,semanticWeight(phrase,weight));
-      present.delete(existing[0]);
-      existing.forEach(x=>present.delete(x));
-      present.add(phrase);
-      return true;
-    }
-    return false;
+  const boost = (tag, amount) => {
+    const x=tags.find(v=>v.tag===tag);
+    if(x) x.weight=Math.min(1.30,Math.max(0.98,x.weight+amount));
+  };
+  const emphasisBoost = (() => {
+    let n=0;
+    if(/最重要的是|重点是|核心是|关键是|一定要|必须有|不能丢|不要丢|务必/.test(text)) n+=0.10;
+    if(/非常|极其|特别|格外|强烈|明显|紧紧|牢牢|用力|深深/.test(text)) n+=0.05;
+    if(/有些|略显|隐约|淡淡|轻微|稍微|一点点/.test(text)) n-=0.03;
+    return n;
+  })();
+
+  // 根据标签在中文句子中的邻近关系建立“语义簇”。
+  const vocabEntries=allVocabulary();
+  const entryFor=tag=>vocabEntries.find(v=>v.canonical_tag===tag)||null;
+  const aliasPositions=[];
+  semanticSource.forEach(node=>{
+    const e=entryFor(node.tag);
+    const aliases=[node.tag,...(e?.aliases||[])].filter(Boolean);
+    let pos=-1, matched="";
+    aliases.forEach(a=>{
+      const p=text.indexOf(a);
+      if(p>=0 && (pos<0||p<pos)){pos=p;matched=a;}
+    });
+    aliasPositions.push({...node,pos,matched});
+  });
+
+  const phraseFor = (members, connector) => {
+    const names=members.filter(Boolean);
+    return names.length ? names.join(" "+connector+" ") : "";
   };
 
-  // 人物外貌：颜色/长度 + hair，颜色/形态 + eyes
-  const hairGroups=[
+  // 中文修饰语 → 最近的动作/外貌/服装标签。
+  const modifierDelta = tag => {
+    const e=entryFor(tag);
+    const aliases=[tag,...(e?.aliases||[])].filter(Boolean);
+    const pos=aliases.map(a=>text.indexOf(a)).filter(x=>x>=0).sort((a,b)=>a-b)[0];
+    if(pos==null) return 0;
+    const before=text.slice(Math.max(0,pos-12),pos);
+    let d=emphasisBoost;
+    if(/非常|极其|特别|格外|强烈|明显|紧紧|牢牢|用力|深深/.test(before)) d+=0.05;
+    if(/有些|略显|隐约|淡淡|轻微|稍微/.test(before)) d-=0.03;
+    if(/最重要|重点|核心|关键|一定要|必须|不能丢|务必/.test(before)) d+=0.08;
+    return d;
+  };
+
+  semanticSource.forEach(x=>{ boost(x.tag,modifierDelta(x.tag)); });
+
+  // 将“颜色/长度 + 主体”理解为同一语义单元，而不是两个互不相关的标签。
+  const groupedPairs=[
     [["black hair","long hair"],"black long hair"],
     [["white hair","long hair"],"white long hair"],
     [["blonde hair","long hair"],"blonde long hair"],
@@ -625,68 +655,87 @@ function parse(text){
     [["white hair","short hair"],"white short hair"],
     [["blonde hair","short hair"],"blonde short hair"],
     [["silver hair","short hair"],"silver short hair"],
-    [["red hair","short hair"],"red short hair"],
-    [["blue hair","short hair"],"blue short hair"]
+    [["black suit","black"],"black suit"],
+    [["black coat","black"],"black coat"],
+    [["white dress","white"],"white dress"],
+    [["school uniform","white"],"white school uniform"]
   ];
-  hairGroups.forEach(([m,p])=>addGroup(m,p,1.11));
 
-  // 服装：颜色/属性 + 服装主体
-  [
-    [["black","dress"],"black dress"],
-    [["white","dress"],"white dress"],
-    [["black","coat"],"black coat"],
-    [["black","suit"],"black suit"],
-    [["white","school uniform"],"white school uniform"]
-  ].forEach(([m,p])=>addGroup(m,p,1.10));
+  // 只有词库本身存在的标签才可作为最终基础成员；组合名是“展示短语”，不会加入词库。
+  const renderGroup=(members, label, baseWeight)=>{
+    const found=members.filter(t=>present.has(t));
+    if(found.length<2) return false;
+    found.forEach(removeTag);
+    const w=Math.min(1.30,Math.max(1.00,baseWeight+emphasisBoost+found.reduce((s,t)=>s+modifierDelta(t),0)));
+    add(label,w);
+    return true;
+  };
 
-  // 动作 + 对象：优先保留完整语义，而不是拆成孤立标签
-  if(present.has("holding umbrella")){
-    const descriptors=[];
-    if(/透明|透明的/.test(text)) descriptors.push("transparent");
-    if(/黑色|黑/.test(text)) descriptors.push("black");
-    if(/白色|白/.test(text)) descriptors.push("white");
-    if(descriptors.length) {
-      removeTags(new Set(["holding umbrella"]));
-      descriptors.forEach(d=>present.delete(d));
-      add("holding a "+descriptors[0]+" umbrella",semanticWeight("holding umbrella",1.16));
-      present.add("holding a "+descriptors[0]+" umbrella");
+  groupedPairs.forEach(([members,label])=>renderGroup(members,label,1.07));
+
+  // 动作关系：动作 + 宾语/环境不是简单拼接，而是按句法邻近度形成一个主语事件。
+  const relationRules=[
+    {base:"holding umbrella", object:/透明|透明的/, label:"holding a transparent umbrella"},
+    {base:"holding umbrella", object:/黑色|黑/, label:"holding a black umbrella"},
+    {base:"holding umbrella", object:/白色|白/, label:"holding a white umbrella"},
+    {base:"holding flower", object:/红色|红/, label:"holding a red flower"},
+    {base:"holding flower", object:/白色|白/, label:"holding a white flower"}
+  ];
+  relationRules.forEach(r=>{
+    if(present.has(r.base)&&r.object.test(text)){
+      removeTag(r.base);
+      add(r.label,Math.min(1.30,1.12+emphasisBoost+modifierDelta(r.base)));
     }
-  }
-  if(present.has("holding flower")){
-    const flowerColor=/红色|红/.test(text)?"red":/白色|白/.test(text)?"white":/黑色|黑/.test(text)?"black":null;
-    if(flowerColor){
-      removeTags(new Set(["holding flower"]));
-      add("holding a "+flowerColor+" flower",semanticWeight("holding flower",1.14));
-      present.delete("holding flower"); present.add("holding a "+flowerColor+" flower");
+  });
+
+  // 事件 + 环境：只有动作和环境在同一局部语境中出现时才组合。
+  const eventRules=[
+    [["walking","rain"],"walking in the rain"],
+    [["standing","rain"],"standing in the rain"],
+    [["running","rain"],"running in the rain"],
+    [["walking","night"],"walking at night"],
+    [["standing","night"],"standing at night"],
+    [["rain","night"],"rainy night"]
+  ];
+  eventRules.forEach(([members,label])=>{
+    if(members.every(t=>present.has(t))){
+      const before=members.map(t=>indexOfTag(t)).filter(i=>i>=0);
+      const span=before.length?Math.max(...before)-Math.min(...before):99;
+      if(span<=6){
+        const w=Math.min(1.30,1.07+emphasisBoost+members.reduce((s,t)=>s+modifierDelta(t),0));
+        members.forEach(removeTag);
+        add(label,w);
+      }
     }
+  });
+
+  // 关系动词优先级高于普通环境词；强调词只提高相关节点，不会把整句全部加重。
+  ["hugging","holding hands","looking at each other","facing each other","kiss","holding umbrella","holding flower"].forEach(tag=>{
+    if(present.has(tag)) boost(tag,0.04+Math.max(0,modifierDelta(tag)));
+  });
+
+  // 如果句子明确指出“不能丢”的细节，只提升该局部语义簇，而不是全局加权。
+  const critical=/最重要的是|重点是|核心是|关键是|一定要|必须有|不能丢|不要丢|务必/;
+  if(critical.test(text)){
+    const clauses=text.split(/[，,。；;！!？?]/).map(s=>s.trim()).filter(Boolean);
+    clauses.forEach(clause=>{
+      tags.forEach(x=>{
+        const e=entryFor(x.tag);
+        const words=[x.tag,...(e?.aliases||[])].filter(Boolean);
+        if(words.some(w=>clause.includes(w))) x.weight=Math.min(1.30,x.weight+0.07);
+      });
+    });
   }
 
-  // 环境组合：只有明确同时出现时才合并，避免把无关标签强行串成句子。
-  if(present.has("walking")&&present.has("rain")){
-    removeTags(new Set(["walking","rain"]));
-    add("walking in the rain",semanticWeight("walking",1.11));
-    present.delete("walking");present.delete("rain");present.add("walking in the rain");
-  }
-  if(present.has("night")&&present.has("rain")){
-    removeTags(new Set(["night","rain"]));
-    add("rainy night",semanticWeight("night",1.08));
-    present.delete("night");present.delete("rain");present.add("rainy night");
-  }
-
-  // 语义强调：显式强调的标签获得额外权重；普通信息保留基础权重。
+  // 未达到可靠组合条件的标签原样保留，避免“为了像自然语言而丢词”。
   tags.forEach(x=>{
-    if(x.weight===1 && present.has(x.tag)) x.weight=semanticWeight(x.tag,1.04);
-    else if(x.weight>1 && /最重要|重点|核心|关键|不能丢|必须/.test(text)) x.weight=Math.min(1.25,x.weight+0.04);
+    if(x.weight!==1) x.weight=Math.round(Math.min(1.30,Math.max(0.98,x.weight))*100)/100;
   });
 
-  // 同类标签保持稳定顺序：人物 → 外貌/服装 → 动作/关系 → 环境 → 构图。
+  // 稳定排序：人物 → 外貌/服装 → 动作/关系 → 环境 → 构图。
   const order={person:0,appearance:1,hair:1,eyes:1,face:1,clothing:2,accessories:2,action:3,pose:3,environment:4,lighting:5,composition:6,camera:6};
-  const vocabMap=new Map(allVocabulary().map(e=>[e.canonical_tag,e]));
-  tags.sort((a,b)=>{
-    const ca=vocabMap.get(a.tag)?.category||"";
-    const cb=vocabMap.get(b.tag)?.category||"";
-    return (order[ca]??7)-(order[cb]??7);
-  });
+  const categoryOf=tag=>entryFor(tag)?.category||"";
+  tags.sort((a,b)=>(order[categoryOf(a.tag)]??7)-(order[categoryOf(b.tag)]??7));
 
   // 直接输入的英文NAI标签透传
   const englishTokens=text.match(/[A-Za-z][A-Za-z0-9_-]{2,}(?:\s+[A-Za-z][A-Za-z0-9_-]{2,})?/g)||[];
