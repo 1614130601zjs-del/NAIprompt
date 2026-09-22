@@ -243,7 +243,7 @@ let library = JSON.parse(localStorage.getItem(LKEY)||"[]");
 let editingSave = null;
 
 const $ = s => document.querySelector(s);
-const esc = s => String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const esc = s => String(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])).replace(new RegExp(String.fromCharCode(39),"g"),"&#39;");
 
 // ── 分类显示名 ────────────────────────────────────────────
 const CAT_LABEL = {
@@ -293,16 +293,16 @@ function renderChars(){
   const box=$("#chars");
   box.innerHTML = chars.length
     ? chars.map((c,i)=>`<div class="char"><b>${esc(c.name)}</b>
-        <div class="small">${esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")}${c.locked?' · <span>已锁定</span>':""}</div>
+        <div class="small">${esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")}${c.locked?" · <span>已锁定</span>":""}</div>
         <div class="row"><button onclick="editChar(${i})">编辑</button><button class="danger" onclick="delChar(${i})">删除</button></div>
       </div>`).join("")
-    : '<div class="small">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>';
+    : "<div class=\"small\">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>";
 }
 function renderMini(){
   const box=$("#charMini");
   box.innerHTML = chars.length
     ? chars.map(c=>`<div class="char"><b>${esc(c.name)}</b><div class="small">${esc([c.gender,c.hair,c.eye].filter(Boolean).join(" · ")||"外貌未设置")}</div></div>`).join("")
-    : '<div class="small">暂无角色</div>';
+    : "<div class=\"small\">暂无角色</div>";
 }
 window.editChar = i=>{
   editing=i; const c=chars[i];
@@ -389,7 +389,7 @@ function toggleTag(tag){
 function renderSelected(){
   $("#selectedTags").innerHTML = selected.size
     ? [...selected].map(t=>`<span class="chip">${esc(t)}</span>`).join("")
-    : '<span class="small">暂无手动选择</span>';
+    : "<span class=\"small\">暂无手动选择</span>";
 }
 $("#vsearch").oninput = renderVocab;
 $("#vsource").onchange = renderVocab;
@@ -622,7 +622,7 @@ function renderLibrary(){
       <button onclick="loadSave('${e.id}')">载入编辑</button>
       <button onclick="useSave('${e.id}')">载入编译器</button>
       <button class="danger" onclick="deleteSave('${e.id}')">删除</button>
-    </div></div>`).join(""):'<div class="small">暂无保存内容。</div>';
+    </div></div>`).join(""):"<div class=\"small\">暂无保存内容。</div>";
 }
 window.loadSave=id=>{const e=library.find(x=>x.id===id);if(!e)return;editingSave=id;$("#saveTitle").value=e.title||"";$("#saveTags").value=e.tags||"";$("#saveNatural").value=e.natural||"";$("#saveNai").value=e.nai||"";$("#libraryStatus").textContent="正在编辑已保存资料。"};
 window.useSave=id=>{const e=library.find(x=>x.id===id);if(!e)return;$("#input").value=e.natural||"";$("#prompt").textContent=e.nai||"等待输入……";showPage("translatePage");$("#status").textContent="已载入："+(e.title||"未命名")};
@@ -645,7 +645,7 @@ $("#saveCurrent").onclick=()=>{
 // ── 自定义词库导入导出 ────────────────────────────────────
 function renderCustomVocab(){
   const box=$("#customVocabList");
-  if(!customVocabulary.length){box.innerHTML='<div class="small">暂无自定义词条。</div>';return;}
+  if(!customVocabulary.length){box.innerHTML="<div class=\"small\">暂无自定义词条。</div>";return;}
   box.innerHTML=customVocabulary.map(e=>`<div class="import-item"><div><b>${esc(e.canonical_tag)}</b><div class="small">${esc((e.aliases||[]).join(" · ")||"无别名")} · ${esc(CAT_LABEL[e.category]||e.category||"custom")}</div></div></div>`).join("");
 }
 function normalizeImported(raw){
