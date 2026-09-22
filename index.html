@@ -24,7 +24,7 @@ label{display:block;font-weight:700;margin-bottom:8px}textarea,input,select{widt
 </head>
 <body>
 <main>
-<header class="head"><div class="eyebrow">NAI PROMPT COMPILER · V0.3</div><div class="title">自然语言 → NAI Prompt</div><div class="sub">离线优先：自然语言编译、角色管理、词库选择、提示词资料库。</div></header>
+<header class="head"><div class="eyebrow">NAI PROMPT COMPILER · V0.4</div><div class="title">自然语言 → NAI Prompt</div><div class="sub">离线优先：自然语言编译、角色管理、词库选择、提示词资料库；支持多角色属性作用域与意图自动识别。</div></header>
 <nav class="nav">
 <button class="active" data-page="translatePage">① 自然语言转化</button><button data-page="characterPage">② 角色管理</button><button data-page="vocabPage">③ 词库预览</button><button data-page="libraryPage">④ 提示词资料库</button>
 </nav>
@@ -72,7 +72,86 @@ function toggleTag(tag){selected.has(tag)?selected.delete(tag):selected.add(tag)
 function renderSelected(){$("#selectedTags").innerHTML=selected.size?[...selected].map(t=>'<span class="chip">'+esc(t)+'</span>').join(""):'<span class="small">暂无手动选择</span>'}
 $("#vsearch").oninput=renderVocab;$("#clearSelected").onclick=()=>{selected.clear();localStorage.setItem(VKEY,"[]");renderVocab();renderSelected()};$("#applySelected").onclick=()=>{showPage("translatePage");$("#status").textContent="已应用 "+selected.size+" 个手选标签。"};function showPage(id){document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id))}
 function matchVocabulary(text){return vocabulary.filter(e=>[e.canonical_tag,...(e.aliases||[])].some(x=>x&&text.toLowerCase().includes(String(x).toLowerCase())))}
-function parse(text){let tags=[],add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};const hits=matchVocabulary(text);hits.forEach(e=>add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1));selected.forEach(t=>add(t,1.08));if(/两个|2个|两名|两人|一男一女/.test(text))add("2people");else if(/女生|女孩|女人|女性/.test(text))add("1girl");else if(/男生|男孩|男人|男性/.test(text))add("1boy");if(/独自|一个人|单独|solo/.test(text))add("solo");const active=chars.find(c=>c.name&&text.includes(c.name));if(active){tags=tags.filter(x=>!["1boy","1girl","solo"].includes(x.tag));add(active.gender==="男"?"1boy":active.gender==="女"?"1girl":"1person",1.05);if(active.hair)add(active.hair,1.2);if(active.eye)add(active.eye,1.2);if(active.feature)add(active.feature,1.12);if(active.cloth)add(active.cloth,1.1);if(!active.hair&&!active.eye&&!active.feature)add("[APPEARANCE]")}if((/男生|男人|男性|男孩|女生|女孩|女人|女性/.test(text))&&!hits.some(e=>e.category==="appearance")&&!active)add("[APPEARANCE]");if(intent==="tension")[["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]].forEach(x=>add(x[0],x[1]));if(intent==="cinematic")[["cinematic composition",1.08],["cinematic lighting",1.08],["depth of field",1.06],["dramatic perspective",1.04]].forEach(x=>add(x[0],x[1]));if(intent==="lonely")[["wide shot",1.06],["off-center composition",1.08],["negative space",1.12],["soft atmospheric lighting",1.04]].forEach(x=>add(x[0],x[1]));const conflicts=[],a=tags.map(x=>x.tag);if(a.includes("standing")&&a.includes("sitting"))conflicts.push("standing / sitting");if(conflicts.length)$("#status").textContent="检测到动作冲突："+conflicts.join("、")+"；当前版本保守保留，后续会按角色作用域消解。";return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ")}
+function parse(text){
+  let tags=[],add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};
+  const lower=text.toLowerCase();
+  const hits=matchVocabulary(text);
+  const matchedTags=hits.map(e=>e.canonical_tag);
+
+  // 先识别已登记角色；多个角色时分别收集其附近的属性、动作和道具。
+  const matchedChars=chars.filter(c=>c.name&&text.includes(c.name));
+  const genderWord=(s)=>/男生|男孩|男人|男性/.test(s)?"1boy":/女生|女孩|女人|女性/.test(s)?"1girl":null;
+  const appearanceFor=(c)=>{
+    const out=[];
+    if(c.hair)out.push(c.hair);
+    if(c.eye)out.push(c.eye);
+    if(c.cloth)out.push(c.cloth);
+    if(c.feature)out.push(c.feature);
+    return out;
+  };
+  const scopeFor=(c)=>{
+    const pos=text.indexOf(c.name);
+    const nextPositions=matchedChars.map(x=>text.indexOf(x.name)).filter(p=>p>pos);
+    const next=nextPositions.length?Math.min(...nextPositions):text.length;
+    return text.slice(Math.max(0,pos-28),Math.min(text.length,next+48));
+  };
+
+  if(matchedChars.length){
+    add(matchedChars.length===2?"2people":matchedChars.length===1?(matchedChars[0].gender==="男"?"1boy":matchedChars[0].gender==="女"?"1girl":"1person"):matchedChars.length+"people",1.05);
+
+    matchedChars.forEach((c,index)=>{
+      const scope=scopeFor(c);
+      appearanceFor(c).forEach((x,i)=>add(x,i<2?1.2:1.12));
+      const scopeHits=matchVocabulary(scope);
+      scopeHits.forEach(e=>{
+        if(["appearance","clothing","action","pose"].includes(e.category)) add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1.08);
+      });
+      const gw=genderWord(scope);
+      if(gw)add(gw,1.04);
+    });
+  }else{
+    hits.forEach(e=>add(e.canonical_tag,e.category==="appearance"?1.18:e.category==="action"?1.12:1));
+    if(/两个|2个|两名|两人|一男一女/.test(text))add("2people");
+    else if(/女生|女孩|女人|女性/.test(text))add("1girl");
+    else if(/男生|男孩|男人|男性/.test(text))add("1boy");
+    if(/独自|一个人|单独|solo/.test(text))add("solo");
+  }
+
+  selected.forEach(t=>add(t,1.08));
+
+  // 未登记角色仍保留外貌占位，不凭空捏造头发、眼睛等属性。
+  const hasPerson=/男生|男孩|男人|男性|女生|女孩|女人|女性|角色|人物/.test(text);
+  if(hasPerson&&!matchedChars.length&&!hits.some(e=>e.category==="appearance"))add("[APPEARANCE]");
+
+  // 视觉意图自动补充：用户说“张力/电影感/孤独感”时也能进入同一编译流程。
+  const effectiveIntent=intent!=="none"?intent:
+    (/张力|紧张|压迫感|冲突感/.test(text)?"tension":
+     /电影感|电影般|镜头感|影视感/.test(text)?"cinematic":
+     /孤独|寂寥|空旷|疏离/.test(text)?"lonely":"none");
+
+  if(effectiveIntent==="tension")[
+    ["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],
+    ["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]
+  ].forEach(x=>add(x[0],x[1]));
+
+  if(effectiveIntent==="cinematic")[
+    ["cinematic composition",1.08],["cinematic lighting",1.08],
+    ["depth of field",1.06],["dramatic perspective",1.04]
+  ].forEach(x=>add(x[0],x[1]));
+
+  if(effectiveIntent==="lonely")[
+    ["wide shot",1.06],["off-center composition",1.08],
+    ["negative space",1.12],["soft atmospheric lighting",1.04]
+  ].forEach(x=>add(x[0],x[1]));
+
+  // 冲突检测：当前先提示，不静默删除用户明确写出的动作。
+  const conflicts=[],a=tags.map(x=>x.tag);
+  if(a.includes("standing")&&a.includes("sitting"))conflicts.push("standing / sitting");
+  if(a.includes("walking")&&a.includes("running"))conflicts.push("walking / running");
+  if(conflicts.length)$("#status").textContent="检测到动作冲突："+conflicts.join("、")+"；当前保留原始信息，后续按角色作用域消解。";
+
+  return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
+}
 $("#translate").onclick=()=>{$("#prompt").textContent=parse($("#input").value.trim())||"请输入自然语言描述。";$("#status").textContent="离线规则编译：已使用本地词库、角色资料与手选标签。"};$("#clear").onclick=()=>{$("#input").value="";$("#prompt").textContent="等待输入……";$("#status").textContent=""};$("#copy").onclick=async()=>{await navigator.clipboard.writeText($("#prompt").textContent);$("#status").textContent="已复制"};
 
 function resetSaveForm(){editingSave=null;$("#saveTitle").value="";$("#saveTags").value="";$("#saveNatural").value="";$("#saveNai").value=""}
