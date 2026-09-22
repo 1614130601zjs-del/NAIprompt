@@ -1,0 +1,548 @@
+{
+  "schema_version": "0.2",
+  "project_role": "NAI prompt compiler vocabulary adapter",
+  "sources": [
+    {
+      "name": "t-hino66/novelai-v4.5-dictionary",
+      "url": "https://github.com/t-hino66/novelai-v4.5-dictionary",
+      "license": "See upstream repository",
+      "evidence": [
+        "nai_v45_observed",
+        "danbooru",
+        "community"
+      ]
+    },
+    {
+      "name": "PYU224/tagdb-updater",
+      "url": "https://github.com/PYU224/tagdb-updater",
+      "license": "See upstream repository",
+      "evidence": [
+        "danbooru",
+        "translation"
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "canonical_tag": "black hair",
+      "aliases": [
+        "黑发",
+        "黑色头发",
+        "black_hair"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "white hair",
+      "aliases": [
+        "白发",
+        "白色头发",
+        "white_hair"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "blonde hair",
+      "aliases": [
+        "金发",
+        "金色头发",
+        "blonde_hair"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "silver hair",
+      "aliases": [
+        "银发",
+        "银色头发",
+        "silver_hair"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "red eyes",
+      "aliases": [
+        "红眼",
+        "红色眼睛",
+        "red_eyes"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "blue eyes",
+      "aliases": [
+        "蓝眼",
+        "蓝色眼睛",
+        "blue_eyes"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "green eyes",
+      "aliases": [
+        "绿眼",
+        "绿色眼睛",
+        "green_eyes"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "long hair",
+      "aliases": [
+        "长发",
+        "long_hair"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "short hair",
+      "aliases": [
+        "短发",
+        "short_hair"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "glasses",
+      "aliases": [
+        "眼镜",
+        "戴眼镜"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "black suit",
+      "aliases": [
+        "黑色西装",
+        "黑西装",
+        "black_suit"
+      ],
+      "category": "clothing",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "black coat",
+      "aliases": [
+        "黑色外套",
+        "黑色风衣",
+        "黑风衣",
+        "black_coat"
+      ],
+      "category": "clothing",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "white dress",
+      "aliases": [
+        "白色连衣裙",
+        "白裙",
+        "white_dress"
+      ],
+      "category": "clothing",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "school uniform",
+      "aliases": [
+        "校服",
+        "school_uniform"
+      ],
+      "category": "clothing",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "standing",
+      "aliases": [
+        "站着",
+        "站立",
+        "站在"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "sitting",
+      "aliases": [
+        "坐着",
+        "坐在"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "walking",
+      "aliases": [
+        "走路",
+        "行走",
+        "正在走"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "running",
+      "aliases": [
+        "跑步",
+        "奔跑",
+        "正在跑"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "looking at viewer",
+      "aliases": [
+        "看向镜头",
+        "看着镜头",
+        "直视镜头"
+      ],
+      "category": "pose",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "facing each other",
+      "aliases": [
+        "面对彼此",
+        "面对面",
+        "对峙",
+        "互相面对"
+      ],
+      "category": "pose",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "holding umbrella",
+      "aliases": [
+        "撑伞",
+        "拿伞",
+        "打伞"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "holding flower",
+      "aliases": [
+        "拿花",
+        "手里拿着花",
+        "捧花"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "cafe",
+      "aliases": [
+        "咖啡店",
+        "咖啡馆"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "street",
+      "aliases": [
+        "街道",
+        "街上",
+        "街边"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "night",
+      "aliases": [
+        "夜晚",
+        "晚上",
+        "深夜"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "rain",
+      "aliases": [
+        "下雨",
+        "雨天",
+        "雨"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "snow",
+      "aliases": [
+        "雪",
+        "下雪",
+        "雪地"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "by window",
+      "aliases": [
+        "窗边",
+        "靠窗"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "rooftop",
+      "aliases": [
+        "天台",
+        "屋顶"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "ruins",
+      "aliases": [
+        "废墟"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "wide shot",
+      "aliases": [
+        "远景",
+        "广角远景",
+        "宽幅镜头"
+      ],
+      "category": "camera",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "close-up",
+      "aliases": [
+        "特写",
+        "近距离特写"
+      ],
+      "category": "camera",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "low angle",
+      "aliases": [
+        "低机位",
+        "仰拍",
+        "低角度"
+      ],
+      "category": "camera",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "high angle",
+      "aliases": [
+        "高机位",
+        "俯拍",
+        "高角度"
+      ],
+      "category": "camera",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "dutch angle",
+      "aliases": [
+        "荷兰角",
+        "倾斜镜头",
+        "倾斜构图"
+      ],
+      "category": "camera",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "dynamic composition",
+      "aliases": [
+        "动态构图",
+        "动感构图"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "dramatic perspective",
+      "aliases": [
+        "戏剧性透视",
+        "强烈透视"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "foreshortening",
+      "aliases": [
+        "缩短法",
+        "强透视缩短"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "negative space",
+      "aliases": [
+        "留白",
+        "负空间"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "off-center composition",
+      "aliases": [
+        "偏心构图",
+        "主体偏置"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "depth of field",
+      "aliases": [
+        "景深",
+        "浅景深"
+      ],
+      "category": "camera",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "dramatic lighting",
+      "aliases": [
+        "戏剧性光照",
+        "戏剧光影"
+      ],
+      "category": "lighting",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "cinematic lighting",
+      "aliases": [
+        "电影感光照",
+        "电影光影"
+      ],
+      "category": "lighting",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "soft lighting",
+      "aliases": [
+        "柔和光线",
+        "柔光"
+      ],
+      "category": "lighting",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "backlighting",
+      "aliases": [
+        "逆光",
+        "背光"
+      ],
+      "category": "lighting",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    }
+  ]
+}
