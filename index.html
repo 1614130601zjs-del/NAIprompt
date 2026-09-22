@@ -182,7 +182,16 @@ function normalizeImported(raw){\n  let arr=Array.isArray(raw)?raw:(Array.isArra
   reader.onload=()=>{
     try{
       let imported=[];
-            if(/\.md$/i.test(file.name)){\n        imported=parseMarkdownVocabulary(String(reader.result));\n      }else if(/\.txt$/i.test(file.name)){\n        imported=String(reader.result).split(/\\r?\\n/).map(line=>line.trim()).filter(Boolean).map(line=>line.replace(/^[-*+]\\s+/,"").replace(/^\\d+[.)]\\s+/,"").trim()).map(line=>{const parts=line.split(/\\s*\\|\\s*|\\s*,\\s*/);return {canonical_tag:parts[0].trim(),aliases:parts.slice(1).filter(Boolean),category:"custom",related:[],conflicts:[],source:"custom"};}).filter(e=>e.canonical_tag);\nlse{
+      if(/\.md$/i.test(file.name)){
+        imported=parseMarkdownVocabulary(String(reader.result));
+      }else if(/\.txt$/i.test(file.name)){
+        imported=String(reader.result).split(/\r?\n/).map(line=>line.trim()).filter(Boolean)
+          .map(line=>line.replace(/^[-*+]\s+/,"").replace(/^\d+[.)]\s+/,"").trim())
+          .map(line=>{
+            const parts=line.split(/\s*\|\s*|\s*,\s*/);
+            return {canonical_tag:parts[0].trim(),aliases:parts.slice(1).filter(Boolean),category:"custom",related:[],conflicts:[],source:"custom"};
+          }).filter(e=>e.canonical_tag);
+      }else{
         imported=normalizeImported(JSON.parse(reader.result));
       }
       if(!imported.length)throw new Error("没有识别到词条");
@@ -193,7 +202,9 @@ function normalizeImported(raw){\n  let arr=Array.isArray(raw)?raw:(Array.isArra
       renderCustomVocab();renderVocab();
       $("#importStatus").textContent="已导入 "+imported.length+" 条；当前自定义词库共 "+customVocabulary.length+" 条。";
       $("#vocabFile").value="";
-    }catch(e){$("#importStatus").textContent="导入失败：JSON、TXT 或 MD 格式无法识别。"}
+    }catch(e){
+      $("#importStatus").textContent="导入失败：JSON、TXT 或 MD 格式无法识别。";
+    }
   };
   reader.readAsText(file);
 };
