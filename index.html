@@ -487,13 +487,17 @@ function renderVocab(){
   const source = $("#vsource").value;
   const list = allVocabulary().filter(e=>{
     if(activeCategory!=="all" && e.category!==activeCategory) return false;
-    if(source==="local" && e.source==="custom") return false;
+    if(source==="local" && e.source!=="adapter") return false;
     if(source==="custom" && e.source!=="custom") return false;
     if(q && ![e.canonical_tag,...(e.aliases||[])].join(" ").toLowerCase().includes(q)) return false;
     return true;
   });
-  $("#vocabCount").textContent = `显示 ${list.length} 条 · 已选 ${selected.size} 条`;
-  $("#vocabGrid").innerHTML = list.map(e=>`
+  // 开源词库可能包含数万条标签，不能一次性把全部词条塞进 DOM。
+  // 词库仍完整参与匹配；这里只限制“预览列表”的渲染数量。
+  const DISPLAY_LIMIT=160;
+  const displayList=list.slice(0,DISPLAY_LIMIT);
+  $("#vocabCount").textContent = `显示 ${displayList.length}/${list.length} 条 · 已选 ${selected.size} 条${list.length>DISPLAY_LIMIT?" · 请搜索以缩小结果":""}`;
+  $("#vocabGrid").innerHTML = displayList.map(e=>`
     <div class="vocab ${selected.has(e.canonical_tag)?"selected":""}" data-tag="${esc(e.canonical_tag)}">
       <div class="vocab-top">
         <input type="checkbox" ${selected.has(e.canonical_tag)?"checked":""}>
@@ -506,7 +510,7 @@ function renderVocab(){
     if(ev.target.tagName==="INPUT") return;
     toggleTag(el.dataset.tag);
   });
-  document.querySelectorAll(".vocab input").forEach((el,i)=>el.onchange=()=>toggleTag(list[i].canonical_tag));
+  document.querySelectorAll(".vocab input").forEach((el,i)=>el.onchange=()=>toggleTag(displayList[i].canonical_tag));
 }
 
 function toggleTag(tag){
@@ -558,6 +562,9 @@ function matchVocabulary(text){
 // ── 核心编译器 ────────────────────────────────────────────
 function parse(text){
   const tags=[], add=(x,w=1)=>{ if(x&&!tags.some(t=>t.tag===x)) tags.push({tag:x,weight:w}); };
+  const removeTag = tag => { const i=tags.findIndex(t=>t.tag===tag); if(i>=0) tags.splice(i,1); };
+  const present = { has: tag => tags.some(t=>t.tag===tag) };
+  const emphasisBoost = intent!=="none" ? 0.05 : 0;
   const conflicts=[];
   if(!text) return "";
 
@@ -881,6 +888,10 @@ function parse(text){
   // 根据标签在中文句子中的邻近关系建立“语义簇”。
   const vocabEntries=allVocabulary();
   const entryFor=tag=>vocabEntries.find(v=>v.canonical_tag===tag)||null;
+
+  // 词组编排必须在后续权重/排序层之前执行；否则语义词组只会被定义而不会生效。
+  applySemanticGroups();
+
   const aliasPositions=[];
   semanticSource.forEach(node=>{
     const e=entryFor(node.tag);
