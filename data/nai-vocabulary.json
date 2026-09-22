@@ -543,6 +543,232 @@
       "related": [],
       "conflicts": [],
       "source": "adapter"
+    },
+    {
+      "canonical_tag": "holding hands",
+      "aliases": [
+        "牵手",
+        "握手",
+        "手牵手"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "hugging",
+      "aliases": [
+        "拥抱",
+        "抱住",
+        "相拥"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "leaning against",
+      "aliases": [
+        "靠着",
+        "倚靠",
+        "倚着"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "looking at each other",
+      "aliases": [
+        "互相看着",
+        "彼此注视",
+        "相互注视"
+      ],
+      "category": "pose",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "back to back",
+      "aliases": [
+        "背靠背",
+        "背对背"
+      ],
+      "category": "pose",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "kneeling",
+      "aliases": [
+        "跪着",
+        "跪姿"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "lying down",
+      "aliases": [
+        "躺着",
+        "躺下"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "reaching out",
+      "aliases": [
+        "伸手",
+        "伸出手"
+      ],
+      "category": "action",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "windblown hair",
+      "aliases": [
+        "被风吹起的头发",
+        "风吹发丝"
+      ],
+      "category": "appearance",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "wet clothes",
+      "aliases": [
+        "湿衣服",
+        "衣服被雨水打湿"
+      ],
+      "category": "clothing",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "street lights",
+      "aliases": [
+        "街灯",
+        "路灯"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "neon lights",
+      "aliases": [
+        "霓虹灯",
+        "霓虹"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "fog",
+      "aliases": [
+        "雾",
+        "薄雾",
+        "雾气"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "sunset",
+      "aliases": [
+        "日落",
+        "夕阳",
+        "黄昏"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "sunrise",
+      "aliases": [
+        "日出",
+        "朝霞",
+        "清晨阳光"
+      ],
+      "category": "environment",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "rim lighting",
+      "aliases": [
+        "轮廓光",
+        "边缘光"
+      ],
+      "category": "lighting",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "volumetric lighting",
+      "aliases": [
+        "体积光",
+        "光束"
+      ],
+      "category": "lighting",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "cinematic composition",
+      "aliases": [
+        "电影感构图",
+        "电影式构图"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "centered composition",
+      "aliases": [
+        "居中构图",
+        "中心构图"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
+    },
+    {
+      "canonical_tag": "symmetrical composition",
+      "aliases": [
+        "对称构图"
+      ],
+      "category": "composition",
+      "related": [],
+      "conflicts": [],
+      "source": "adapter"
     }
   ]
 }
