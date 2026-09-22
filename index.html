@@ -8,14 +8,11 @@
 :root{
   --bg:#f5f3ef;--card:#fff;--ink:#171717;--muted:#777;--line:#ddd7cf;
   --accent:#b24b63;--soft:#f4dce2;
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
-  box-sizing:border-box;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,-apple-system,sans-serif}
 @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--card:#242424;--ink:#f0f0f0;--muted:#999;--line:#333;--soft:#3a2028}}
-main{max-width:1080px;margin:auto;padding:24px 16px 60px}
+main{max-width:1080px;margin:auto;padding:calc(24px + env(safe-area-inset-top,0px)) 16px calc(60px + env(safe-area-inset-bottom,0px))}
 .head{margin-bottom:16px}
 .eyebrow{font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
 .title{font-size:28px;font-weight:800;line-height:1.1}
@@ -1029,7 +1026,7 @@ function parse(text){
     return e && appearanceCategories.has(e.category);
   });
   if(genericPerson&&!matchedChars.length&&!explicitAppearance){
-    const pIndex=tags.findIndex(x=>/^\\d+(?:girl|boy|people|person)$/.test(x.tag));
+    const pIndex=tags.findIndex(x=>/^\d+(?:girl|boy|people|person)$/.test(x.tag));
     const appearanceTag={tag:"[APPEARANCE]",weight:1};
     if(pIndex>=0) tags.splice(pIndex+1,0,appearanceTag); else tags.unshift(appearanceTag);
   }
