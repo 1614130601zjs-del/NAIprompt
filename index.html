@@ -44,6 +44,8 @@ main{max-width:980px;margin:auto;padding:28px 16px 60px}.head{display:flex;justi
 <script>
 const KEY="nai_prompt_characters_v01";
 let chars=JSON.parse(localStorage.getItem(KEY)||"[]"), editing=null, intent="none";
+let vocabulary=[];
+fetch("data/nai-vocabulary.json").then(r=>r.json()).then(d=>{vocabulary=d.entries||[];$("#status").textContent="词库已加载："+vocabulary.length+" 条；来源适配器已启用。"}).catch(()=>{$("#status").textContent="词库加载失败，使用内置规则。"});
 const $=s=>document.querySelector(s);
 function save(){localStorage.setItem(KEY,JSON.stringify(chars));renderChars()}
 function renderChars(){const box=$("#chars");box.innerHTML=chars.length?chars.map((c,i)=>'<div class="char"><b>'+esc(c.name)+'</b><div class="small">'+esc([c.gender,c.hair,c.eye,c.cloth,c.feature].filter(Boolean).join(" · ")||"外貌未设置")+'</div><div class="row"><button onclick="editChar('+i+')">编辑</button><button class="danger" onclick="delChar('+i+')">删除</button></div></div>').join(""):'<div class="small">暂无角色。未填写外貌时，生成器会保留 [APPEARANCE] 占位。</div>'}
@@ -54,23 +56,58 @@ $("#newChar").onclick=()=>{editing=null;["cname","cgender","chair","ceye","cclot
 $("#cancelChar").onclick=()=>$("#editor").classList.add("hidden")
 $("#saveChar").onclick=()=>{let c={name:$("#cname").value.trim(),gender:$("#cgender").value.trim(),hair:$("#chair").value.trim(),eye:$("#ceye").value.trim(),cloth:$("#ccloth").value.trim(),feature:$("#cfeature").value.trim()};if(!c.name)return;editing===null?chars.push(c):chars[editing]=c;save();$("#editor").classList.add("hidden")}
 document.querySelectorAll("[data-intent]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-intent]").forEach(x=>x.classList.remove("active"));b.classList.add("active");intent=b.dataset.intent})
+function matchVocabulary(text){
+ let hits=[];
+ for(const e of vocabulary){
+   const aliases=[e.canonical_tag,...(e.aliases||[])];
+   if(aliases.some(x=>x && text.toLowerCase().includes(String(x).toLowerCase()))) hits.push(e);
+ }
+ return hits;
+}
+function classifyCharacters(text){
+ const blocks=[];
+ const parts=text.split(/[，。；;、\\n]/).filter(Boolean);
+ for(const part of parts){
+   const gender=/男生|男孩|男人|男性/.test(part)?"male":/女生|女孩|女人|女性/.test(part)?"female":null;
+   if(gender||/他|她|男|女/.test(part)) blocks.push({text:part,gender});
+ }
+ return blocks;
+}
 function parse(text){
- let p=[]; const add=x=>{if(x&&!p.includes(x))p.push(x)};
+ let tags=[], scoped=[];
+ const add=(x,w=1)=>{if(x&&!tags.some(t=>t.tag===x))tags.push({tag:x,weight:w})};
+ const hits=matchVocabulary(text);
+ hits.forEach(e=>add(e.canonical_tag, e.category==="appearance"?1.18:e.category==="action"?1.12:1.0));
  if(/两个|2个|两名|两人|一男一女/.test(text)) add("2people");
  else if(/女生|女孩|女人|女性/.test(text)) add("1girl");
  else if(/男生|男孩|男人|男性/.test(text)) add("1boy");
  if(/独自|一个人|单独|solo/.test(text)) add("solo");
- const map=[[/黑发|黑色头发/,"black hair"],[/白发|白色头发/,"white hair"],[/金发|金色头发|金发/,"blonde hair"],[/银发|银色头发/,"silver hair"],[/长发/,"long hair"],[/短发/,"short hair"],[/红眼|红色眼睛/,"red eyes"],[/蓝眼|蓝色眼睛/,"blue eyes"],[/眼镜/,"glasses"],[/黑色风衣|黑风衣/,"black coat, long coat"],[/黑色西装|黑西装/,"black suit"],[/白色连衣裙|白裙/,"white dress"],[/校服/,"school uniform"],[/雨伞|撑伞/,"umbrella"],[/咖啡店|咖啡馆/,"cafe"],[/街道|街上/,"street"],[/雨夜|下雨的夜晚/,"night, rain"],[/雪地|雪中/,"snow"],[/窗边/,"by window"],[/废墟/,"ruins"],[/天台|屋顶/,"rooftop"],[/站着|站立/,"standing"],[/坐着/,"sitting"],[/走路|行走/,"walking"],[/聊天|交谈/,"talking"],[/对峙|对抗/,"facing each other"]]; map.forEach(([re,v])=>{if(re.test(text))v.split(", ").forEach(add)});
- let hasAppearance=/黑发|黑色头发|白发|白色头发|金发|金色头发|银发|银色头发|长发|短发|红眼|红色眼睛|蓝眼|蓝色眼睛|眼镜/.test(text);
- if((/男生|男人|男性|男孩/.test(text)||/女生|女孩|女人|女性/.test(text))&&!hasAppearance)add("[APPEARANCE]");
  const active=chars.find(c=>c.name&&text.includes(c.name));
- if(active){p=p.filter(x=>!["1boy","1girl","solo"].includes(x));add(active.gender==="男"?"1boy":active.gender==="女"?"1girl":"1person"); if(active.hair)add(active.hair); if(active.eye)add(active.eye); if(active.feature)add(active.feature); if(active.cloth)add(active.cloth); if(!active.hair&&!active.eye&&!active.feature)add("[APPEARANCE]")}
- if(intent==="tension")["low angle","dutch angle","dynamic composition","dramatic perspective","foreshortening","dramatic lighting"].forEach(add);
- if(intent==="cinematic")["cinematic composition","cinematic lighting","depth of field","dramatic perspective"].forEach(add);
- if(intent==="lonely")["wide shot","off-center composition","negative space","soft atmospheric lighting"].forEach(add);
- return weight(p).join(", ")
+ if(active){
+   tags=tags.filter(x=>!["1boy","1girl","solo"].includes(x.tag));
+   add(active.gender==="男"?"1boy":active.gender==="女"?"1girl":"1person",1.05);
+   if(active.hair)add(active.hair,1.2); if(active.eye)add(active.eye,1.2);
+   if(active.feature)add(active.feature,1.12); if(active.cloth)add(active.cloth,1.1);
+   if(!active.hair&&!active.eye&&!active.feature)add("[APPEARANCE]");
+ }
+ const appearanceHits=hits.filter(e=>e.category==="appearance");
+ const hasAppearance=appearanceHits.length>0;
+ if((/男生|男人|男性|男孩|女生|女孩|女人|女性/.test(text))&&!hasAppearance&&!active)add("[APPEARANCE]");
+ if(intent==="tension"){
+   [["low angle",1.12],["dutch angle",1.1],["dynamic composition",1.12],["dramatic perspective",1.1],["foreshortening",1.06],["dramatic lighting",1.08]].forEach(x=>add(x[0],x[1]));
+ }
+ if(intent==="cinematic"){
+   [["cinematic composition",1.08],["cinematic lighting",1.08],["depth of field",1.06],["dramatic perspective",1.04]].forEach(x=>add(x[0],x[1]));
+ }
+ if(intent==="lonely"){
+   [["wide shot",1.06],["off-center composition",1.08],["negative space",1.12],["soft atmospheric lighting",1.04]].forEach(x=>add(x[0],x[1]));
+ }
+ const conflicts=[];
+ const actionTags=tags.map(x=>x.tag);
+ if(actionTags.includes("standing")&&actionTags.includes("sitting")) conflicts.push("standing / sitting");
+ if(conflicts.length) $("#status").textContent="检测到动作冲突："+conflicts.join("、")+"；当前保守保留，后续版本将按角色作用域自动消解。";
+ return tags.map(x=>x.weight!==1?"("+x.tag+":"+x.weight.toFixed(2)+")":x.tag).join(", ");
 }
-function weight(arr){return arr.map(x=>/^(black hair|white hair|blonde hair|silver hair|red eyes|blue eyes|glasses)$/.test(x)?"("+x+":1.15)":x)}
 $("#translate").onclick=()=>{$("#prompt").textContent=parse($("#input").value.trim())||"请输入自然语言描述。";$("#status").textContent="V0.1：规则解析模式。后续可接入真正的语义模型。"}
 $("#clear").onclick=()=>{$("#input").value="";$("#prompt").textContent="等待输入……";$("#status").textContent=""}
 $("#copy").onclick=async()=>{await navigator.clipboard.writeText($("#prompt").textContent);$("#status").textContent="已复制"}
