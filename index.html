@@ -576,6 +576,118 @@ function parse(text){
     if(/独自|一个人|单独|solo/.test(text)) add("solo");
   }
 
+
+  // ── 语义编排：把已有标签按自然语义关系组合，并按信息重要性动态加权 ──
+  // 这里只组合已经进入 tags 的词，不凭空创建新的词库标签。
+  const semanticWeight = (tag, base=1.08) => {
+    const emphasis = [
+      [/最重要|重点是|核心是|关键是|一定要|必须有|不能丢|不要丢/, 0.10],
+      [/非常|极其|特别|格外|紧紧|牢牢|明显|强烈/, 0.06],
+      [/有些|略显|隐约|淡淡|轻微|稍微/, -0.03]
+    ];
+    let w=base;
+    emphasis.forEach(([re,delta])=>{ if(re.test(text)) w+=delta; });
+    const core = ["hugging","holding umbrella","holding flower","holding hands","looking at each other","kiss","facing each other"];
+    if(core.includes(tag)) w+=0.04;
+    if(["street","city","night","day","rain","snow","indoors","outdoors"].includes(tag)) w-=0.02;
+    return Math.max(0.98,Math.min(1.25,w));
+  };
+
+  const present = new Set(tags.map(x=>x.tag));
+  const removeTags = set => {
+    for(let i=tags.length-1;i>=0;i--) if(set.has(tags[i].tag)) tags.splice(i,1);
+  };
+  const addGroup = (members, phrase, weight) => {
+    const existing=members.filter(x=>present.has(x));
+    if(existing.length>=2){
+      removeTags(new Set(existing));
+      add(phrase,semanticWeight(phrase,weight));
+      present.delete(existing[0]);
+      existing.forEach(x=>present.delete(x));
+      present.add(phrase);
+      return true;
+    }
+    return false;
+  };
+
+  // 人物外貌：颜色/长度 + hair，颜色/形态 + eyes
+  const hairGroups=[
+    [["black hair","long hair"],"black long hair"],
+    [["white hair","long hair"],"white long hair"],
+    [["blonde hair","long hair"],"blonde long hair"],
+    [["silver hair","long hair"],"silver long hair"],
+    [["red hair","long hair"],"red long hair"],
+    [["blue hair","long hair"],"blue long hair"],
+    [["brown hair","long hair"],"brown long hair"],
+    [["pink hair","long hair"],"pink long hair"],
+    [["purple hair","long hair"],"purple long hair"],
+    [["black hair","short hair"],"black short hair"],
+    [["white hair","short hair"],"white short hair"],
+    [["blonde hair","short hair"],"blonde short hair"],
+    [["silver hair","short hair"],"silver short hair"],
+    [["red hair","short hair"],"red short hair"],
+    [["blue hair","short hair"],"blue short hair"]
+  ];
+  hairGroups.forEach(([m,p])=>addGroup(m,p,1.11));
+
+  // 服装：颜色/属性 + 服装主体
+  [
+    [["black","dress"],"black dress"],
+    [["white","dress"],"white dress"],
+    [["black","coat"],"black coat"],
+    [["black","suit"],"black suit"],
+    [["white","school uniform"],"white school uniform"]
+  ].forEach(([m,p])=>addGroup(m,p,1.10));
+
+  // 动作 + 对象：优先保留完整语义，而不是拆成孤立标签
+  if(present.has("holding umbrella")){
+    const descriptors=[];
+    if(/透明|透明的/.test(text)) descriptors.push("transparent");
+    if(/黑色|黑/.test(text)) descriptors.push("black");
+    if(/白色|白/.test(text)) descriptors.push("white");
+    if(descriptors.length) {
+      removeTags(new Set(["holding umbrella"]));
+      descriptors.forEach(d=>present.delete(d));
+      add("holding a "+descriptors[0]+" umbrella",semanticWeight("holding umbrella",1.16));
+      present.add("holding a "+descriptors[0]+" umbrella");
+    }
+  }
+  if(present.has("holding flower")){
+    const flowerColor=/红色|红/.test(text)?"red":/白色|白/.test(text)?"white":/黑色|黑/.test(text)?"black":null;
+    if(flowerColor){
+      removeTags(new Set(["holding flower"]));
+      add("holding a "+flowerColor+" flower",semanticWeight("holding flower",1.14));
+      present.delete("holding flower"); present.add("holding a "+flowerColor+" flower");
+    }
+  }
+
+  // 环境组合：只有明确同时出现时才合并，避免把无关标签强行串成句子。
+  if(present.has("walking")&&present.has("rain")){
+    removeTags(new Set(["walking","rain"]));
+    add("walking in the rain",semanticWeight("walking",1.11));
+    present.delete("walking");present.delete("rain");present.add("walking in the rain");
+  }
+  if(present.has("night")&&present.has("rain")){
+    removeTags(new Set(["night","rain"]));
+    add("rainy night",semanticWeight("night",1.08));
+    present.delete("night");present.delete("rain");present.add("rainy night");
+  }
+
+  // 语义强调：显式强调的标签获得额外权重；普通信息保留基础权重。
+  tags.forEach(x=>{
+    if(x.weight===1 && present.has(x.tag)) x.weight=semanticWeight(x.tag,1.04);
+    else if(x.weight>1 && /最重要|重点|核心|关键|不能丢|必须/.test(text)) x.weight=Math.min(1.25,x.weight+0.04);
+  });
+
+  // 同类标签保持稳定顺序：人物 → 外貌/服装 → 动作/关系 → 环境 → 构图。
+  const order={person:0,appearance:1,hair:1,eyes:1,face:1,clothing:2,accessories:2,action:3,pose:3,environment:4,lighting:5,composition:6,camera:6};
+  const vocabMap=new Map(allVocabulary().map(e=>[e.canonical_tag,e]));
+  tags.sort((a,b)=>{
+    const ca=vocabMap.get(a.tag)?.category||"";
+    const cb=vocabMap.get(b.tag)?.category||"";
+    return (order[ca]??7)-(order[cb]??7);
+  });
+
   // 直接输入的英文NAI标签透传
   const englishTokens=text.match(/[A-Za-z][A-Za-z0-9_-]{2,}(?:\s+[A-Za-z][A-Za-z0-9_-]{2,})?/g)||[];
   englishTokens.forEach(x=>{
