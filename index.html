@@ -784,7 +784,7 @@ function parse(text){
     {re:/伞/,type:"umbrella"}
   ];
   centers.forEach(c=>{
-    const cm=[...textN.matchAll(c.re)];
+    const cm=[...textN.matchAll(new RegExp(c.re.source, c.re.flags.includes("g") ? c.re.flags : c.re.flags + "g"))];
     cm.forEach(x=>{
       const before=textN.slice(Math.max(0,x.index-10),x.index);
       colorMap.forEach(([cn,en])=>{
