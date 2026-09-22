@@ -620,8 +620,11 @@ function parse(text){
     return [...s];
   };
   const addUnique=(arr,tag,weight=1)=>{
+    // 词库条目有时是对象；输出层只允许 canonical tag 字符串，避免出现 [object Object]。
+    if(tag && typeof tag==="object") tag=tag.canonical_tag||tag.tag||"";
+    tag=String(tag||"").trim();
     if(!tag) return;
-    if(!arr.some(x=>x.tag===tag)) arr.push({tag,weight});
+    if(!arr.some(x=>x && x.tag===tag)) arr.push({tag,weight});
   };
 
   // ── 1. 人物实体解析 ───────────────────────────────────
@@ -820,6 +823,9 @@ function parse(text){
 
   nodes.forEach(n=>{
     if(consumed.has(n.tag)) return;
+    // “牵手/握手”等关系已经被语义事件吸收；不要再把开源词库中的
+    // handholding / hand holding / holding another's hand 等近义条目逐个吐出来。
+    if(/牵着手|牵住手|牵手|手牵手/.test(textN) && /hand/i.test(String(n.tag)) && /hold|hand/i.test(String(n.tag))) return;
     // 颜色碎片不单独输出，已经由“颜色+中心名词”处理。
     if(modifiers.some(x=>x.tag===n.tag)) return;
     // generic person tokens不作为普通词库碎片。
@@ -915,6 +921,7 @@ function parse(text){
 
   // 权重格式化；普通标签不加权，真正需要强调的语义单元才加权。
   return output
+    .filter(x=>x && typeof x.tag==="string" && x.tag.trim())
     .filter((x,i,a)=>a.findIndex(y=>y.tag===x.tag)===i)
     .map(x=>x.weight!==1?"("+x.tag+":"+Math.min(1.30,x.weight).toFixed(2)+")":x.tag)
     .join(", ");
