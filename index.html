@@ -262,6 +262,14 @@ let library = readArray(LKEY);
 let editingSave = null;
 
 const $ = s => document.querySelector(s);
+
+// Bind page navigation before the rest of the app initializes.
+// If another module throws during startup, the main tabs must still remain usable.
+function showPage(id){
+  document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));
+  document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id));
+}
+document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 const esc = s => String(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])).replace(new RegExp(String.fromCharCode(39),"g"),"&#39;");
 
 // ── 分类显示名 ────────────────────────────────────────────
@@ -457,11 +465,7 @@ $("#saveChar").onclick = ()=>{
 };
 
 // ── 导航 ──────────────────────────────────────────────────
-function showPage(id){
-  document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));
-  document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id));
-}
-document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+// Main navigation is bound above before app initialization so startup errors cannot disable the tabs.
 document.querySelectorAll("[data-intent]").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("[data-intent]").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); intent=b.dataset.intent;
